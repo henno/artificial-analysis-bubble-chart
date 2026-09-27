@@ -1,8 +1,12 @@
 # Artificial Analysis: Intelligence, Time, and Cost bubbles
 
-**Artificial Analysis lists more than 600 models.** A model can be smart but slow or costly. Checking intelligence, time, and cost across separate charts makes it hard to find a good choice.
+## More than 600 models to compare
 
-**Hide weaker choices automatically.** Turn on **Hide dominated models** to hide each selected model that has an alternative at least as smart, fast, and cheap, and better on one measure. Set tolerance to 0% for exact comparisons. Higher values also hide near matches.
+Artificial Analysis lists more than 600 models. A model can be smart but slow or costly. Checking intelligence, time, and cost across separate charts makes it hard to find a good choice.
+
+## Hide dominated models automatically
+
+Turn on **Hide dominated models** to hide each selected model that has an alternative at least as smart, fast, and cheap, and better on one measure. Set tolerance to 0% for exact comparisons. Higher values also hide near matches.
 
 This Tampermonkey script brings all three measures into one bubble chart on the [homepage](https://artificialanalysis.ai/) and [models page](https://artificialanalysis.ai/models). The chart appears before the site's own charts. Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper. Select a bubble to see exact values.
 
