@@ -21,10 +21,11 @@ If you cannot see that switch, turn on **Developer mode** at the top right of `c
 
 ## 3. Install the chart script
 
-1. Open the [chart installation link](https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js).
-2. If Tampermonkey opens an installation page, click **Install**.
+1. Open the [chart's Greasy Fork page](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles).
+2. Click **Install this script**.
+3. When Tampermonkey opens its installation page, click **Install**.
 
-If you only see script text or Chrome downloads a file:
+If the Greasy Fork button does not open Tampermonkey, you can install the [GitHub script file](https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js) from a URL:
 
 1. Click the Tampermonkey icon and open **Dashboard**.
 2. Open **Utilities**.
@@ -53,7 +54,7 @@ If the chart is missing, reload the page. Check that Tampermonkey is enabled and
 - On a phone, swipe the chart sideways or use the arrow buttons.
 - Click **Clear filters** to restore your earlier AA model selection.
 
-Your settings stay in this browser after a reload. Tampermonkey can install new versions from the script link.
+Your settings stay in this browser after a reload. Tampermonkey checks for updates from the source you installed. Install only one copy of this chart script.
 
 ## Help and sources
 

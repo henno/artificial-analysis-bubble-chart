@@ -2,7 +2,7 @@
 
 This Tampermonkey script adds a comparison chart to the [Artificial Analysis homepage](https://artificialanalysis.ai/) and [models page](https://artificialanalysis.ai/models). It appears before the site's own charts. The horizontal axis shows time per task, the vertical axis shows Intelligence Index, and bubble size shows cost per task.
 
-**[Install the script](https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js)** · **[Chrome installation guide](CHROME-PAIGALDUS.md)**
+**[Install from Greasy Fork](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles)** · **[Chrome installation guide](CHROME-PAIGALDUS.md)** · **[GitHub script file](artificial-analysis-3d-bubble.user.js)**
 
 ## What you can do
 
@@ -20,7 +20,7 @@ Settings are saved in this browser's `localStorage` and restored after a page re
 
 The script reads data from the open AA page. A model needs all three metrics to appear in the bubble chart. AA can change its page structure or data format, which may require a script update. Bubble sizes use a compressed scale for readability; select a bubble to see the exact cost.
 
-The script does not send data to another server. Tampermonkey may check GitHub for updates to this file. This is an independent addition and is not an official Artificial Analysis feature.
+The script does not send data to another server. Tampermonkey checks the source used for installation for updates: Greasy Fork for Greasy Fork installs, or GitHub for direct GitHub installs. This is an independent addition and is not an official Artificial Analysis feature.
 
 ## Files
 
