@@ -17,7 +17,7 @@ Artificial Analysis lists more than 600 models. Showing many models at once make
 ## What you can do
 
 - Set a minimum Intelligence Index and maximum time and cost with sliders or number fields. The chart updates as you move a slider.
-- Search by model or provider. The search, sliders, and dominance filter also update AA's other charts.
+- Search by model or provider. Turn on **Regex** to use a pattern such as `(Claude)|(GPT)`; matching ignores case. The chart shows an error if the pattern is invalid. The search, sliders, and dominance filter also update AA's other charts.
 - Open the AA model picker from the new chart.
 - Show a dashed two-dimensional Pareto line and purple outlines for the exact three-dimensional Pareto set. Click the `?` buttons in the chart for explanations.
 - Open “Why models are hidden” to see which model and values caused each model to be hidden.

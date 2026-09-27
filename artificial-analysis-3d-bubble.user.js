@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.0.4
+// @version      2.1.0
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -20,7 +20,7 @@
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 15;
   const NS = 'http://www.w3.org/2000/svg';
-  const state = { labels: true, pareto2: true, pareto3: true, hideDominated: false, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', filters: {}, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
+  const state = { labels: true, pareto2: true, pareto3: true, hideDominated: false, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
   const filterMetrics = [
     { metric: 'intelligence', key: 'intelligenceMin', direction: 'min', step: 0.1, digits: 1 },
     { metric: 'time', key: 'timeMax', step: 0.1, digits: 1 },
@@ -35,6 +35,7 @@
       }
       if (Number.isFinite(saved.dominanceTolerance)) state.dominanceTolerance = Math.max(0, Math.min(50, saved.dominanceTolerance));
       if (typeof saved.search === 'string') state.search = saved.search.slice(0, 200);
+      if (typeof saved.regex === 'boolean') state.regex = saved.regex;
       for (const { key } of filterMetrics) {
         if (Number.isFinite(saved.filters?.[key]) && saved.filters[key] >= 0) state.filters[key] = saved.filters[key];
       }
@@ -44,7 +45,7 @@
   function saveSettings() {
     const filters = Object.fromEntries(filterMetrics.filter(({ key }) => Number.isFinite(state.filters[key])).map(({ key }) => [key, state.filters[key]]));
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ labels: state.labels, pareto2: state.pareto2, pareto3: state.pareto3, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, filters, nativeBaseIds: state.nativeBaseIds }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ labels: state.labels, pareto2: state.pareto2, pareto3: state.pareto3, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, regex: state.regex, filters, nativeBaseIds: state.nativeBaseIds }));
     } catch (_) { /* Keep the current page usable if storage is unavailable. */ }
   }
   restoreSettings();
@@ -134,6 +135,21 @@
 
   function hasNativeModelFilter() {
     return state.hideDominated || state.search.trim() !== '' || filterMetrics.some(({ key }) => state.filters[key] != null && state.filters[key] !== '');
+  }
+
+  function getSearchMatcher() {
+    const query = state.search.trim();
+    if (!query) return { matches: () => true, error: '' };
+    if (state.regex) {
+      try {
+        const pattern = new RegExp(query, 'i');
+        return { matches: model => pattern.test(model.name) || pattern.test(model.provider), error: '' };
+      } catch (_) {
+        return { matches: () => true, error: 'Invalid regular expression. Check parentheses, brackets, and escapes. Search is ignored until you fix it.' };
+      }
+    }
+    const text = query.toLocaleLowerCase();
+    return { matches: model => `${model.name} ${model.provider}`.toLocaleLowerCase().includes(text), error: '' };
   }
 
   function sameIds(a, b) {
@@ -262,9 +278,10 @@
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="pareto3" checked> 3D Pareto outline</label><button type="button" class="aa3d-help-button" data-help="pareto3" aria-label="Explain 3D Pareto outline" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated"> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">15%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label>
-          <input type="search" data-control="search" placeholder="Find model or provider" aria-label="Find model or provider">
+          <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Find model or provider" aria-label="Find model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
+        <p class="aa3d-search-error" id="aa3d-search-error" role="alert" hidden></p>
         <p class="aa3d-filter-note">Search and filters also update AA's other charts. Clear filters to restore your AA model selection.</p>
         <div class="aa3d-filters">
           <div class="aa3d-range"><label for="aa3d-intelligence">Minimum Intelligence Index</label><input id="aa3d-intelligence" type="number" min="0" data-number="intelligenceMin" aria-label="Minimum Intelligence Index"><input type="range" min="0" data-filter="intelligenceMin" aria-label="Minimum Intelligence Index slider"></div>
@@ -288,7 +305,9 @@
         #${ID} .aa3d-controls{display:flex;align-items:center;flex-wrap:wrap;gap:.6rem 1rem;margin:1rem 0 .4rem}
         #${ID} .aa3d-control-group{display:inline-flex;align-items:center;gap:.2rem}#${ID} .aa3d-help-button{width:21px;height:21px;border:1px solid #aaa;border-radius:50%;background:#fff;color:#444;cursor:pointer;font-weight:700}#${ID} .aa3d-help{max-width:700px;padding:.45rem .65rem;border-left:3px solid #7837aa;background:#f7f2fb;line-height:1.45}#${ID} .aa3d-filter-note{margin:.15rem 0 .5rem;font-size:11px}
         #${ID} label{display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap;cursor:pointer}
-        #${ID} input[type=search]{height:30px;min-width:165px;max-width:260px;flex:1;margin-left:auto;padding:0 .55rem;border:1px solid #ddd;border-radius:5px;background:#fff;color:#171717}
+        #${ID} .aa3d-search-wrap{display:flex;align-items:center;gap:.5rem;min-width:250px;max-width:370px;flex:1;margin-left:auto}
+        #${ID} input[type=search]{height:30px;min-width:0;width:100%;flex:1;padding:0 .55rem;border:1px solid #ddd;border-radius:5px;background:#fff;color:#171717}
+        #${ID} .aa3d-regex{flex:none;font-size:12px}#${ID} .aa3d-search-error{margin:.2rem 0;color:#b42318;font-size:11px}#${ID} input[type=search][aria-invalid=true]{border-color:#b42318}
         #${ID} .aa3d-dominance{gap:.35rem}#${ID} .aa3d-dominance output{min-width:2.5em;font-variant-numeric:tabular-nums}
         #${ID} .aa3d-dominance[data-disabled=true]{opacity:.5}#${ID} .aa3d-dominance input:disabled{cursor:not-allowed}
         #${ID} .aa3d-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:end;gap:.75rem;margin:.65rem 0}
@@ -304,11 +323,12 @@
         #${ID} .aa3d-tip{position:absolute;z-index:5;max-width:270px;padding:.55rem .7rem;border:1px solid #d4d4d4;border-radius:5px;background:#fff;box-shadow:0 3px 12px #0002;pointer-events:none;white-space:pre-line;line-height:1.5}
         #${ID} .aa3d-hit{fill:transparent;stroke:transparent;cursor:pointer}#${ID} .aa3d-hit:focus{fill:none;stroke:#111;stroke-width:2;outline:none}#${ID} details.aa3d-missing,#${ID} details.aa3d-hidden-models{margin:.25rem 0;font-size:11px;color:#555}#${ID} details ul{max-height:160px;overflow:auto;margin:.3rem 0;padding-left:1.4rem}#${ID} .aa3d-mobile-nav{display:none;align-items:center;gap:.4rem;margin:.5rem 0;color:#555;font-size:11px}#${ID} .aa3d-mobile-nav button{min-width:30px;min-height:30px;border:1px solid #ddd;border-radius:4px;background:#fff}#${ID} .aa3d-mobile-nav button:first-of-type{margin-left:auto}
         @media(max-width:900px){#${ID} .aa3d-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:620px){#${ID}{padding:.65rem}#${ID} .aa3d-head{flex-wrap:wrap}#${ID} .aa3d-picker-wrap,#${ID} .aa3d-model-picker{width:100%;max-width:none}#${ID} input[type=search]{min-width:100%;margin-left:0}#${ID} .aa3d-filters{grid-template-columns:1fr}#${ID} .aa3d-mobile-nav{display:flex}}
+        @media(max-width:620px){#${ID}{padding:.65rem}#${ID} .aa3d-head{flex-wrap:wrap}#${ID} .aa3d-picker-wrap,#${ID} .aa3d-model-picker{width:100%;max-width:none}#${ID} .aa3d-search-wrap{min-width:100%;max-width:none;margin-left:0}#${ID} .aa3d-filters{grid-template-columns:1fr}#${ID} .aa3d-mobile-nav{display:flex}}
       `;
       chart.prepend(style);
       firstChartRow.before(chart);
       chart.querySelector('[data-control="search"]').value = state.search;
+      chart.querySelector('[data-control="search"]').placeholder = state.regex ? 'Regex: (Claude)|(GPT)' : 'Find model or provider';
       chart.querySelector('.aa3d-model-picker').addEventListener('click', event => {
         const button = event.currentTarget;
         const nativeButton = findNativeModelPicker();
@@ -356,6 +376,7 @@
         }
         else state[input.dataset.control] = input.checked;
         if (input.dataset.control === 'hideDominated') updateTolerance();
+        if (input.dataset.control === 'regex') chart.querySelector('[data-control="search"]').placeholder = state.regex ? 'Regex: (Claude)|(GPT)' : 'Find model or provider';
         state.pinned = null;
         saveSettings();
         if (input.dataset.control === 'dominanceTolerance') scheduleLiveRefresh();
@@ -386,10 +407,13 @@
       });
       chart.querySelector('.aa3d-clear').addEventListener('click', () => {
         state.search = '';
+        state.regex = false;
         state.filters = {};
         state.hideDominated = false;
         state.dominanceTolerance = DEFAULT_DOMINANCE_TOLERANCE;
         chart.querySelector('[data-control="search"]').value = '';
+        chart.querySelector('[data-control="search"]').placeholder = 'Find model or provider';
+        chart.querySelector('[data-control="regex"]').checked = false;
         chart.querySelector('[data-control="hideDominated"]').checked = false;
         chart.querySelector('[data-control="dominanceTolerance"]').value = state.dominanceTolerance;
         chart.querySelector('[data-value="dominanceTolerance"]').textContent = `${state.dominanceTolerance}%`;
@@ -605,9 +629,14 @@
     const all = rawModels.filter(model => !missingMetrics(model).length);
     syncSliders(all);
     const bound = key => state.filters[key] === '' || state.filters[key] == null ? null : Number(state.filters[key]);
-    const search = state.search.trim().toLocaleLowerCase();
+    const { matches, error } = getSearchMatcher();
+    const searchInput = chart.querySelector('[data-control="search"]');
+    const searchError = chart.querySelector('.aa3d-search-error');
+    searchInput.setAttribute('aria-invalid', String(!!error));
+    searchError.textContent = error;
+    searchError.hidden = !error;
     let models = all.filter(model => {
-      if (search && !`${model.name} ${model.provider}`.toLocaleLowerCase().includes(search)) return false;
+      if (!matches(model)) return false;
       for (const { metric, key, direction } of filterMetrics) {
         const limit = bound(key);
         if (model[metric] < 0 || (limit !== null && (direction === 'min' ? model[metric] < limit : model[metric] > limit))) return false;
@@ -620,7 +649,7 @@
       models = models.filter(model => !hiddenIds.has(model.id));
     }
     syncNativeModelSelection(data, models);
-    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.labels, state.pareto2, state.pareto3, state.hideDominated, state.dominanceTolerance, state.search, state.filters, chart.clientWidth]);
+    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.labels, state.pareto2, state.pareto3, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
     updateExplanations(all, missing, hidden);

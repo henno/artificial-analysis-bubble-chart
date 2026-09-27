@@ -47,7 +47,7 @@ If the chart is missing, reload the page. Check that Tampermonkey is enabled and
 
 - Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper. Select a bubble to see its exact values.
 - Use the sliders or number fields to set a minimum Intelligence Index and maximum time and cost.
-- Use **AA model selection** to pick models. Search and chart filters also update AA's other charts.
+- Use **AA model selection** to pick models. Turn on **Regex** beside the search field to match names or providers with a pattern such as `(Claude)|(GPT)`. Search and chart filters also update AA's other charts.
 - Click a `?` button to learn about the Pareto line, outlines, or hidden models.
 - Turn on **Hide dominated models** to remove models with a better or nearly better alternative. Use **Tolerance** to control the near comparison; 0% means exact comparison. Open **Why models are hidden** to see the values.
 - Open the missing-data list if the number of bubbles is less than the number of selected AA models.
