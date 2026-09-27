@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.1.0
+// @version      2.1.1
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -278,7 +278,7 @@
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="pareto3" checked> 3D Pareto outline</label><button type="button" class="aa3d-help-button" data-help="pareto3" aria-label="Explain 3D Pareto outline" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated"> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">15%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label>
-          <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Find model or provider" aria-label="Find model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
+          <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
         <p class="aa3d-search-error" id="aa3d-search-error" role="alert" hidden></p>
@@ -328,7 +328,7 @@
       chart.prepend(style);
       firstChartRow.before(chart);
       chart.querySelector('[data-control="search"]').value = state.search;
-      chart.querySelector('[data-control="search"]').placeholder = state.regex ? 'Regex: (Claude)|(GPT)' : 'Find model or provider';
+      chart.querySelector('[data-control="search"]').placeholder = state.regex ? 'Regex: (Claude)|(GPT)' : 'Filter by model or provider';
       chart.querySelector('.aa3d-model-picker').addEventListener('click', event => {
         const button = event.currentTarget;
         const nativeButton = findNativeModelPicker();
@@ -376,7 +376,7 @@
         }
         else state[input.dataset.control] = input.checked;
         if (input.dataset.control === 'hideDominated') updateTolerance();
-        if (input.dataset.control === 'regex') chart.querySelector('[data-control="search"]').placeholder = state.regex ? 'Regex: (Claude)|(GPT)' : 'Find model or provider';
+        if (input.dataset.control === 'regex') chart.querySelector('[data-control="search"]').placeholder = state.regex ? 'Regex: (Claude)|(GPT)' : 'Filter by model or provider';
         state.pinned = null;
         saveSettings();
         if (input.dataset.control === 'dominanceTolerance') scheduleLiveRefresh();
@@ -412,7 +412,7 @@
         state.hideDominated = false;
         state.dominanceTolerance = DEFAULT_DOMINANCE_TOLERANCE;
         chart.querySelector('[data-control="search"]').value = '';
-        chart.querySelector('[data-control="search"]').placeholder = 'Find model or provider';
+        chart.querySelector('[data-control="search"]').placeholder = 'Filter by model or provider';
         chart.querySelector('[data-control="regex"]').checked = false;
         chart.querySelector('[data-control="hideDominated"]').checked = false;
         chart.querySelector('[data-control="dominanceTolerance"]').value = state.dominanceTolerance;
