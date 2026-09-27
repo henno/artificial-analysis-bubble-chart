@@ -1,6 +1,6 @@
-# Install the Artificial Analysis chart in Chrome
+# Add the comparison chart to Artificial Analysis in Chrome
 
-You need Google Chrome on a computer. The script adds a chart that compares AI models by Intelligence Index, time per task, and cost per task.
+Use Google Chrome on a computer. These steps install Tampermonkey and a userscript. The userscript adds a chart to the Artificial Analysis website. It compares AI models by Intelligence Index, time per task, and cost per task.
 
 ## 1. Install Tampermonkey
 
@@ -19,7 +19,7 @@ If your school manages Chrome and blocks the extension, ask your teacher or IT a
 
 If you cannot see that switch, turn on **Developer mode** at the top right of `chrome://extensions/`. Tampermonkey needs one of these settings to run scripts in Chrome.
 
-## 3. Install the chart script
+## 3. Install the userscript
 
 1. Open the [chart's Greasy Fork page](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles).
 2. Click **Install this script**.
