@@ -1,14 +1,12 @@
-# Artificial Analysis: Intelligence, Time, and Cost bubbles
+# ArtificialAnalysis.io All-in-one (Intelligence, Time, and Cost) comparison view
 
-## More than 600 models to compare
+## Problem #1: Cannot compare Intelligence, Time and Cost at the same time
 
-Artificial Analysis lists more than 600 models. A model can be smart but slow or costly. Checking intelligence, time, and cost across separate charts makes it hard to find a good choice.
+[Artificial Analysis](https://artificialanalysis.ai/) allows you to compare only two aspects of the three. This script brings all three measures into a single bubble chart. Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper.
 
-## Hide dominated models automatically
+## Problem #2: There are too many models
 
-Turn on **Hide dominated models** to hide each selected model that has an alternative at least as smart, fast, and cheap, and better on one measure. Set tolerance to 0% for exact comparisons. Higher values also hide near matches.
-
-This Tampermonkey script brings all three measures into one bubble chart on the [homepage](https://artificialanalysis.ai/) and [models page](https://artificialanalysis.ai/models). The chart appears before the site's own charts. Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper. Select a bubble to see exact values.
+Artificial Analysis has more than 600 models. If you turn on all models the chart becomes very crowded, making it impossible to see which model to pick. This script allows you to to automatically  **Hide dominated models** to hide any model that has an alternative at least as smart, fast, and cheap, and better on at least one measure. Set tolerance to 0% for exact comparisons, higher values also hide near matches (for example 5.6 Terra High is only very little cheaper than 6 Sol High but 6 Sol High considerably smarter, making Terra inferior choice despite having slightly cheaper cost)
 
 **[Install from Greasy Fork](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles)** · **[Chrome installation guide](CHROME-INSTALLATION.md)** · **[GitHub script file](artificial-analysis-3d-bubble.user.js)**
 
