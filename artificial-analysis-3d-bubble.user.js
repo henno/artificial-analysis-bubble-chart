@@ -1,14 +1,13 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.0.3
+// @version      2.0.4
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
 // @updateURL    https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js
 // @downloadURL  https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js
-// @match        https://artificialanalysis.ai/models*
-// @match        https://artificialanalysis.ai/
+// @match        https://artificialanalysis.ai/*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -596,7 +595,7 @@
   }
 
   function refresh(force = false) {
-    if (!getFirstChartRow()) { chart?.remove(); chart = null; return; }
+    if (!document.querySelector('#intelligence') || !getComparisonSection() || !getFirstChartRow()) { chart?.remove(); chart = null; return; }
     if (!createChartContainer()) return;
     const data = findArtificialAnalysisData();
     if (!data) { status.textContent = 'Waiting for Artificial Analysis model data…'; return; }
