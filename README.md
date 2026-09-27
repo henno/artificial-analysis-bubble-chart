@@ -1,4 +1,4 @@
-# Easily compare AI models by intelligence, time, and cost on Artificial Analysis
+# Easily compare AI models by intelligence, time and cost on Artificial Analysis
 
 ## Problem 1: No chart shows all three measures
 
