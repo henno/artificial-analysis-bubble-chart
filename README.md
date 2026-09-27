@@ -1,6 +1,8 @@
 # Artificial Analysis: Intelligence, Time, and Cost bubbles
 
-This Tampermonkey script adds a comparison chart to the [Artificial Analysis homepage](https://artificialanalysis.ai/) and [models page](https://artificialanalysis.ai/models). It appears before the site's own charts. The horizontal axis shows time per task, the vertical axis shows Intelligence Index, and bubble size shows cost per task.
+An AI model may score high on intelligence but still be too slow or costly for your task. [Artificial Analysis](https://artificialanalysis.ai/) has the numbers, yet comparing its separate charts makes this trade-off easy to miss.
+
+This Tampermonkey script brings all three measures into one bubble chart on the [homepage](https://artificialanalysis.ai/) and [models page](https://artificialanalysis.ai/models). The chart appears before the site's own charts. Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper. Select a bubble to see exact values.
 
 **[Install from Greasy Fork](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles)** · **[Chrome installation guide](CHROME-INSTALLATION.md)** · **[GitHub script file](artificial-analysis-3d-bubble.user.js)**
 
