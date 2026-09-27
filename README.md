@@ -23,7 +23,6 @@ Skript ise ei saada andmeid teisele serverile. Tampermonkey võib kontrollida se
 ## Failid
 
 - [`artificial-analysis-3d-bubble.user.js`](artificial-analysis-3d-bubble.user.js) on paigaldatav skript.
-- [`script.md`](script.md) on sama skripti koopia käsitsi lugemiseks või kopeerimiseks.
 - [`CHROME-PAIGALDUS.md`](CHROME-PAIGALDUS.md) on sammhaaval juhend Chrome'i kasutajale.
 
 Vigadest saab teada anda [GitHubi Issues lehel](https://github.com/henno/artificial-analysis-bubble-chart/issues).
