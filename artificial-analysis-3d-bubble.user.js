@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         ArtificialAnalysis.io: Intelligence, Time, Cost bubbles
+// @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
 // @version      2.0.2
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
