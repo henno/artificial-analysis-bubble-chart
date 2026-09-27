@@ -4,6 +4,8 @@ This Tampermonkey script adds a comparison chart to the [Artificial Analysis hom
 
 **[Install from Greasy Fork](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles)** · **[Chrome installation guide](CHROME-PAIGALDUS.md)** · **[GitHub script file](artificial-analysis-3d-bubble.user.js)**
 
+![Artificial Analysis intelligence, time, and cost bubble chart](assets/chart-desktop.png)
+
 ## What you can do
 
 - Set a minimum Intelligence Index and maximum time and cost with sliders or exact number fields. The chart updates while you move a slider.
