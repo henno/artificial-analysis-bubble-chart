@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.0.2
+// @version      2.0.3
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -119,12 +119,14 @@
   }
 
   function dominates(a, b, tolerance = 0) {
-      if (b.id === a.id) return false;
-      const exact = b.time <= a.time && b.cost <= a.cost && b.intelligence >= a.intelligence && (b.time < a.time || b.cost < a.cost || b.intelligence > a.intelligence);
-      if (exact || !tolerance) return exact;
-      const closeEnough = b.time <= a.time * (1 + tolerance) && b.cost <= a.cost * (1 + tolerance) && b.intelligence >= a.intelligence * (1 - tolerance);
-      const muchBetter = b.time < a.time * (1 - tolerance) || b.cost < a.cost * (1 - tolerance) || b.intelligence > a.intelligence * (1 + tolerance);
-      return closeEnough && muchBetter;
+    if (b.id === a.id) return false;
+    const exact = b.time <= a.time && b.cost <= a.cost && b.intelligence >= a.intelligence && (b.time < a.time || b.cost < a.cost || b.intelligence > a.intelligence);
+    if (exact || !tolerance) return exact;
+    const relative = (difference, baseline) => difference <= 0 ? 0 : baseline > 0 ? difference / baseline : Infinity;
+    const largestLoss = Math.max(relative(b.time - a.time, a.time), relative(b.cost - a.cost, a.cost), relative(a.intelligence - b.intelligence, a.intelligence));
+    const largestGain = Math.max(relative(a.time - b.time, a.time), relative(a.cost - b.cost, a.cost), relative(b.intelligence - a.intelligence, a.intelligence));
+    // Keep the improvement rule fixed while tolerance grows, so hidden models cannot reappear.
+    return largestLoss <= tolerance && largestGain > largestLoss;
   }
 
   function compute3DPareto(models, tolerance = 0) {
@@ -338,7 +340,7 @@
       const helpText = {
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
-        dominance: 'Hide a model when another is smarter, faster, and cheaper. Tolerance can also hide a model if another is much better on one measure and within the selected percentage on the other measures. Example: at 15%, a model 20% faster can qualify even if it is up to 15% more expensive. Open “Why models are hidden” below the filters for exact comparisons.',
+        dominance: 'Hide a model when another is smarter, faster, and cheaper. Tolerance also allows a disadvantage up to the selected percentage if the largest improvement is greater than the largest disadvantage. Example: at 15%, a model 20% faster can qualify even if it is 15% more expensive. Raising tolerance never brings a hidden model back. Open “Why models are hidden” below the filters for exact comparisons.',
       };
       chart.querySelectorAll('[data-help]').forEach(button => button.addEventListener('click', () => {
         const panel = chart.querySelector('.aa3d-help');
