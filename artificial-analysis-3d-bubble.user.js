@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.1.1
+// @version      2.2.0
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -20,7 +20,7 @@
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 15;
   const NS = 'http://www.w3.org/2000/svg';
-  const state = { labels: true, pareto2: true, pareto3: true, hideDominated: false, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
+  const state = { labels: true, pareto2: true, pareto3: true, relativeBubbleSize: false, hideDominated: false, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
   const filterMetrics = [
     { metric: 'intelligence', key: 'intelligenceMin', direction: 'min', step: 0.1, digits: 1 },
     { metric: 'time', key: 'timeMax', step: 0.1, digits: 1 },
@@ -30,7 +30,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (!saved || typeof saved !== 'object') return;
-      for (const key of ['labels', 'pareto2', 'pareto3', 'hideDominated']) {
+      for (const key of ['labels', 'pareto2', 'pareto3', 'relativeBubbleSize', 'hideDominated']) {
         if (typeof saved[key] === 'boolean') state[key] = saved[key];
       }
       if (Number.isFinite(saved.dominanceTolerance)) state.dominanceTolerance = Math.max(0, Math.min(50, saved.dominanceTolerance));
@@ -45,7 +45,7 @@
   function saveSettings() {
     const filters = Object.fromEntries(filterMetrics.filter(({ key }) => Number.isFinite(state.filters[key])).map(({ key }) => [key, state.filters[key]]));
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ labels: state.labels, pareto2: state.pareto2, pareto3: state.pareto3, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, regex: state.regex, filters, nativeBaseIds: state.nativeBaseIds }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ labels: state.labels, pareto2: state.pareto2, pareto3: state.pareto3, relativeBubbleSize: state.relativeBubbleSize, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, regex: state.regex, filters, nativeBaseIds: state.nativeBaseIds }));
     } catch (_) { /* Keep the current page usable if storage is unavailable. */ }
   }
   restoreSettings();
@@ -271,11 +271,12 @@
       chart.lang = 'en';
       chart.innerHTML = `
         <div class="aa3d-head"><div><h3>Intelligence Index vs. Time per Task</h3><p>Higher = smarter · Left = faster · Smaller bubble = cheaper. Select a bubble for exact values.</p></div><div class="aa3d-picker-wrap"><span>AA model selection</span><button type="button" class="aa3d-model-picker" aria-label="Select AA models" aria-haspopup="dialog" aria-expanded="false" disabled><span>Select models</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg></button></div></div>
-        <div class="aa3d-legend"><span><i class="aa3d-example-dot"></i> Provider colour</span><span>Bubble area is compressed for readability; select a bubble for exact cost.</span><details><summary>Provider colours</summary><div class="aa3d-provider-list"></div></details></div>
+        <div class="aa3d-legend"><span><i class="aa3d-example-dot"></i> Provider colour</span><span class="aa3d-size-note">Bubble area is compressed for readability; select a bubble for exact cost.</span><details><summary>Provider colours</summary><div class="aa3d-provider-list"></div></details></div>
         <div class="aa3d-controls">
           <label><input type="checkbox" data-control="labels" checked> Labels</label>
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="pareto2" checked> 2D Pareto line</label><button type="button" class="aa3d-help-button" data-help="pareto2" aria-label="Explain 2D Pareto line" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="pareto3" checked> 3D Pareto outline</label><button type="button" class="aa3d-help-button" data-help="pareto3" aria-label="Explain 3D Pareto outline" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
+          <span class="aa3d-control-group"><label><input type="checkbox" data-control="relativeBubbleSize"> Size by % of highest cost</label><button type="button" class="aa3d-help-button" data-help="bubbleSize" aria-label="Explain bubble size" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated"> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">15%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
@@ -359,6 +360,7 @@
       const helpText = {
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
+        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half the bubble area. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
         dominance: 'Hide a model when another is smarter, faster, and cheaper. Tolerance also allows a disadvantage up to the selected percentage if the largest improvement is greater than the largest disadvantage. Example: at 15%, a model 20% faster can qualify even if it is 15% more expensive. Raising tolerance never brings a hidden model back. Open “Why models are hidden” below the filters for exact comparisons.',
       };
       chart.querySelectorAll('[data-help]').forEach(button => button.addEventListener('click', () => {
@@ -532,7 +534,10 @@
     }
     const xScale = value => plot.left + (value - minX) / (maxX - minX) * (plot.right - plot.left);
     const yScale = value => plot.bottom - (value - minY) / (maxY - minY) * (plot.bottom - plot.top);
-    const radius = cost => minCost === maxCost ? 13 : 3 + (Math.log1p(cost) - Math.log1p(minCost)) / (Math.log1p(maxCost) - Math.log1p(minCost)) * 40;
+    // Circle area follows the cost ratio. Keep a small visible marker for low costs.
+    const radius = cost => state.relativeBubbleSize
+      ? maxCost === 0 ? 43 : Math.max(3, 43 * Math.sqrt(cost / maxCost))
+      : minCost === maxCost ? 13 : 3 + (Math.log1p(cost) - Math.log1p(minCost)) / (Math.log1p(maxCost) - Math.log1p(minCost)) * 40;
     const pareto2 = new Set(compute2DPareto(models).map(m => m.id));
     const pareto3 = new Set(compute3DPareto(models).map(m => m.id));
     models.forEach(m => { m.pareto2 = pareto2.has(m.id); m.pareto3 = pareto3.has(m.id); });
@@ -624,6 +629,7 @@
     const data = findArtificialAnalysisData();
     if (!data) { status.textContent = 'Waiting for Artificial Analysis model data…'; return; }
     updateModelPicker(data);
+    chart.querySelector('.aa3d-size-note').textContent = state.relativeBubbleSize ? 'Bubble area shows cost as a share of the highest visible cost; select a bubble for exact cost.' : 'Bubble area is compressed for readability; select a bubble for exact cost.';
     const rawModels = modelMetrics(data.models, data.colorById, data.colorByProvider);
     const missing = rawModels.map(model => ({ model, metrics: missingMetrics(model) })).filter(item => item.metrics.length);
     const all = rawModels.filter(model => !missingMetrics(model).length);
@@ -649,7 +655,7 @@
       models = models.filter(model => !hiddenIds.has(model.id));
     }
     syncNativeModelSelection(data, models);
-    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.labels, state.pareto2, state.pareto3, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
+    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.labels, state.pareto2, state.pareto3, state.relativeBubbleSize, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
     updateExplanations(all, missing, hidden);
