@@ -1,60 +1,63 @@
-# Juhend õpilasele: graafiku paigaldamine Chrome'i
+# Install the Artificial Analysis chart in Chrome
 
-Vaja on arvutis töötavat Google Chrome'i. Skript lisab Artificial Analysise lehele graafiku, kus saab võrrelda AI mudelite intelligentsust, ülesande aega ja hinda.
+You need Google Chrome on a computer. The script adds a chart that compares AI models by Intelligence Index, time per task, and cost per task.
 
-## 1. Paigalda Tampermonkey
+## 1. Install Tampermonkey
 
-1. Ava Chrome'is [Tampermonkey Chrome'i veebipoe leht](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo).
-2. Vajuta **Add to Chrome** või **Lisa Chrome'i**.
-3. Kinnita nupuga **Add extension** või **Lisa laiendus**.
-4. Soovi korral vajuta aadressiriba kõrval pusletüki ikooni ja kinnita Tampermonkey tööriistaribale.
+1. Open the [Tampermonkey Chrome Web Store page](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo).
+2. Click **Add to Chrome**.
+3. Click **Add extension**.
+4. You can pin Tampermonkey from Chrome's extensions menu beside the address bar.
 
-Kui kooli hallatav Chrome ei luba laiendust paigaldada, küsi abi õpetajalt või IT-haldurilt.
+If your school manages Chrome and blocks the extension, ask your teacher or IT administrator for help.
 
-## 2. Luba kasutajaskriptid
+## 2. Allow user scripts
 
-1. Ava Chrome'is `chrome://extensions/`.
-2. Leia **Tampermonkey** ja ava **Details** ehk **Üksikasjad**.
-3. Lülita sisse **Allow User Scripts** ehk **Luba kasutajaskriptid**.
+1. Open `chrome://extensions/` in Chrome.
+2. Find **Tampermonkey** and open **Details**.
+3. Turn on **Allow User Scripts**.
 
-Kui seda lülitit sinu Chrome'is ei ole, lülita `chrome://extensions/` lehe paremas ülanurgas sisse **Developer mode** ehk **Arendajarežiim**. Tampermonkey vajab Chrome'is üht neist valikutest, et skripte käivitada.
+If you cannot see that switch, turn on **Developer mode** at the top right of `chrome://extensions/`. Tampermonkey needs one of these settings to run scripts in Chrome.
 
-## 3. Paigalda graafiku skript
+## 3. Install the chart script
 
-1. Ava [graafiku skripti paigalduslink](https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js).
-2. Kui avaneb Tampermonkey paigaldusleht, vajuta **Install** ehk **Paigalda**.
+1. Open the [chart installation link](https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js).
+2. If Tampermonkey opens an installation page, click **Install**.
 
-Kui näed ainult skripti teksti või fail laaditakse alla, tee nii:
+If you only see script text or Chrome downloads a file:
 
-1. Vajuta Tampermonkey ikooni ja ava **Dashboard** ehk **Juhtpaneel**.
-2. Ava vahekaart **Utilities** ehk **Tööriistad**.
-3. Kleebi väljale **Install from URL** see aadress:
+1. Click the Tampermonkey icon and open **Dashboard**.
+2. Open **Utilities**.
+3. Paste this address into **Install from URL**:
 
    `https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js`
 
-4. Vajuta selle välja kõrval **Install** ja kinnita paigaldus avaneval lehel.
+4. Click **Install** beside the field, then confirm on the page that opens.
 
-## 4. Kontrolli tulemust
+## 4. Check that it works
 
-1. Ava [artificialanalysis.ai](https://artificialanalysis.ai/) või [mudelite leht](https://artificialanalysis.ai/models).
-2. Keri jaotiseni **Highlights**. Seal peaks esimene graafik olema **Intelligence Index vs. Time per Task**.
-3. Proovi liigutada mõnda graafiku liugurit. Ringid peavad kohe muutuma.
+1. Open the [Artificial Analysis homepage](https://artificialanalysis.ai/) or [models page](https://artificialanalysis.ai/models).
+2. Go to **Highlights**. The first chart should be **Intelligence Index vs. Time per Task**.
+3. Move a slider. The bubbles should change before you release it.
 
-Kui graafikut ei ole, värskenda lehte ja kontrolli, et Tampermonkey oleks sisse lülitatud ning **Allow User Scripts** oleks lubatud. Kui oled varem skripti käsitsi paigaldanud, jäta Tampermonkey juhtpaneelil sisse ainult üks selle graafiku skript.
+If the chart is missing, reload the page. Check that Tampermonkey is enabled and **Allow User Scripts** is on. If you installed an older copy by hand, leave only one copy of this chart script enabled in Tampermonkey Dashboard.
 
-## Graafiku kasutamine
+## Use the chart
 
-- **Intelligence Index** peidab valitud piirist nõrgemad mudelid.
-- **Time per Task** ja **Cost per Task** määravad suurima lubatud aja ja hinna.
-- Ülemine mudelivaliku rippmenüü muudab ka AA teiste graafikute mudelivalikut.
-- **Hide dominated models** peidab mudelid, millele leidub parem või ligikaudu parem alternatiiv. **Tolerance** määrab, kui suur erinevus võib veel olla väike. Väärtus **0%** tähendab täpset võrdlust.
-- **Clear filters** eemaldab otsingu ja filtrid.
+- Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper. Select a bubble to see its exact values.
+- Use the sliders or number fields to set a minimum Intelligence Index and maximum time and cost.
+- Use **AA model selection** to pick models. Search and chart filters also update AA's other charts.
+- Click a `?` button to learn about the Pareto line, outlines, or hidden models.
+- Turn on **Hide dominated models** to remove models with a better or nearly better alternative. Use **Tolerance** to control the near comparison; 0% means exact comparison. Open **Why models are hidden** to see the values.
+- Open the missing-data list if the number of bubbles is less than the number of selected AA models.
+- On a phone, swipe the chart sideways or use the arrow buttons.
+- Click **Clear filters** to restore your earlier AA model selection.
 
-Skript jätab seaded selles brauseris meelde. Uue versiooni ilmumisel saab Tampermonkey seda paigalduslingilt uuendada.
+Your settings stay in this browser after a reload. Tampermonkey can install new versions from the script link.
 
-## Abi ja allikad
+## Help and sources
 
-- [Skripti avalik lähtekood ja vigadest teatamine](https://github.com/henno/artificial-analysis-bubble-chart)
-- [Chrome'i juhend laienduse paigaldamiseks](https://support.google.com/chrome/answer/2664769)
-- [Tampermonkey juhend kasutajaskriptide lubamiseks](https://www.tampermonkey.net/faq.php?ext=dhdg&q=Q209)
-- [Tampermonkey juhend URL-i kaudu paigaldamiseks](https://www.tampermonkey.net/faq.php?ext=dhdg&q=Q106)
+- [Source code and issue tracker](https://github.com/henno/artificial-analysis-bubble-chart)
+- [Chrome's extension installation guide](https://support.google.com/chrome/answer/2664769)
+- [Tampermonkey's guide to enabling user scripts](https://www.tampermonkey.net/faq.php?ext=dhdg&q=Q209)
+- [Tampermonkey's guide to installing from a URL](https://www.tampermonkey.net/faq.php?ext=dhdg&q=Q106)

@@ -1,28 +1,30 @@
-# Artificial Analysis: intelligentsuse, aja ja hinna graafik
+# Artificial Analysis: Intelligence, Time, and Cost bubbles
 
-See Tampermonkey skript lisab [Artificial Analysise](https://artificialanalysis.ai/) avalehele ja [mudelite lehele](https://artificialanalysis.ai/models) võrdlusgraafiku. Graafiku horisontaaltelg näitab ülesande aega, vertikaaltelg intelligentsusindeksit ja ringi suurus ülesande hinda. Graafik asub lehe esimese graafikuna „Highlights” jaotises.
+This Tampermonkey script adds a comparison chart to the [Artificial Analysis homepage](https://artificialanalysis.ai/) and [models page](https://artificialanalysis.ai/models). It appears before the site's own charts. The horizontal axis shows time per task, the vertical axis shows Intelligence Index, and bubble size shows cost per task.
 
-**[Paigalda skript Chrome'i](https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js)** · **[Juhend õpilasele](CHROME-PAIGALDUS.md)**
+**[Install the script](https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js)** · **[Chrome installation guide](CHROME-PAIGALDUS.md)**
 
-## Mida saab teha?
+## What you can do
 
-- Piirata mudeleid intelligentsuse alampiiri ning aja ja hinna ülempiiriga.
-- Otsida mudeli või pakkuja nime järgi.
-- Valida mudeleid samast AA mudelivalikust, mida kasutavad teised graafikud.
-- Näidata 2D Pareto joont ja 3D Pareto mudelite piirjoont.
-- Peita domineeritud või peaaegu domineeritud mudelid. Taluvuse liuguri väärtus 0% kasutab täpset võrdlust; vaikimisi 15% lubab väikest erinevust ühes mõõdus, kui teine mudel on mõnes mõõdus selgelt parem.
+- Set a minimum Intelligence Index and maximum time and cost with sliders or exact number fields. The chart updates while you move a slider.
+- Search by model or provider name. The search and filters also update AA's model selection in its other charts.
+- Open the same AA model picker from the custom chart.
+- Show a dashed two-dimensional Pareto line and purple outlines for the exact three-dimensional Pareto set. Click the `?` buttons in the chart for explanations.
+- Hide dominated or nearly dominated models. At 0% tolerance, the comparison is exact. Open “Why models are hidden” to see the model and values behind each decision.
+- See which selected models have missing Intelligence Index, time, or cost data.
+- Select a bubble for exact values. Bubble targets support touch, mouse, and keyboard. On a phone, swipe the chart or use its left and right buttons.
 
-Filtrid muudavad ka AA enda mudelivalikut. Seaded salvestatakse sama brauseri `localStorage`-isse ja taastatakse lehe värskendamisel.
+Settings are saved in this browser's `localStorage` and restored after a page reload. The “Clear filters” button restores the AA model selection you had before filtering.
 
-## Andmed ja piirangud
+## Data and limits
 
-Skript loeb andmed avatud AA lehelt. Mudel ilmub graafikule ainult siis, kui AA annab talle intelligentsusindeksi, ülesande aja ja ülesande hinna. AA lehe ülesehituse muutus võib skripti tööd mõjutada.
+The script reads data from the open AA page. A model needs all three metrics to appear in the bubble chart. AA can change its page structure or data format, which may require a script update. Bubble sizes use a compressed scale for readability; select a bubble to see the exact cost.
 
-Skript ise ei saada andmeid teisele serverile. Tampermonkey võib kontrollida selle faili uuendusi GitHubist. See on sõltumatu täiendus ega ole Artificial Analysise ametlik osa.
+The script does not send data to another server. Tampermonkey may check GitHub for updates to this file. This is an independent addition and is not an official Artificial Analysis feature.
 
-## Failid
+## Files
 
-- [`artificial-analysis-3d-bubble.user.js`](artificial-analysis-3d-bubble.user.js) on paigaldatav skript.
-- [`CHROME-PAIGALDUS.md`](CHROME-PAIGALDUS.md) on sammhaaval juhend Chrome'i kasutajale.
+- [`artificial-analysis-3d-bubble.user.js`](artificial-analysis-3d-bubble.user.js) — installable userscript.
+- [`CHROME-PAIGALDUS.md`](CHROME-PAIGALDUS.md) — step-by-step Chrome guide.
 
-Vigadest saab teada anda [GitHubi Issues lehel](https://github.com/henno/artificial-analysis-bubble-chart/issues).
+Report problems on [GitHub Issues](https://github.com/henno/artificial-analysis-bubble-chart/issues).
