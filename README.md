@@ -8,7 +8,7 @@
 
 Artificial Analysis lists more than 600 models. Showing many models at once makes it hard to find a good choice. Turn on **Hide dominated models** to hide a selected model when another selected model is at least as intelligent, at least as fast, and no more expensive, with an improvement in at least one measure. Set **Tolerance** to 0% for this exact comparison. Raise it to hide near matches too: a model can be slightly worse on one measure if it is much better on another. For example, GPT-5.6 Terra (high) can be hidden by GPT-6 Sol (high) when Sol is much smarter and at least as fast, even if Terra costs a little less.
 
-**[Install from Greasy Fork](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles)** · **[Chrome installation guide](CHROME-INSTALLATION.md)** · **[GitHub script file](artificial-analysis-3d-bubble.user.js)**
+**[Install from Greasy Fork](https://greasyfork.org/en/scripts/597690-artificialanalysis-io-compare-intelligence-time-and-cost)** · **[Chrome installation guide](CHROME-INSTALLATION.md)** · **[GitHub script file](artificial-analysis-3d-bubble.user.js)**
 
 ![Artificial Analysis intelligence, time, and cost bubble chart](assets/chart-desktop.png)
 

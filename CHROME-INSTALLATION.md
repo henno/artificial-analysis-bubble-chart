@@ -21,7 +21,7 @@ If you cannot see that switch, turn on **Developer mode** at the top right of `c
 
 ## 3. Install the userscript
 
-1. Open the [chart's Greasy Fork page](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles).
+1. Open the [chart's Greasy Fork page](https://greasyfork.org/en/scripts/597690-artificialanalysis-io-compare-intelligence-time-and-cost).
 2. Click **Install this script**.
 3. When Tampermonkey opens its installation page, click **Install**.
 
