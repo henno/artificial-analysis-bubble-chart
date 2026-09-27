@@ -1,12 +1,12 @@
-# ArtificialAnalysis.io All-in-one (Intelligence, Time, and Cost) comparison view
+# Compare AI models by intelligence, time, and cost on Artificial Analysis
 
-## Problem #1: Cannot compare Intelligence, Time and Cost at the same time
+## Problem 1: No chart shows all three measures
 
-[Artificial Analysis](https://artificialanalysis.ai/) allows you to compare only two aspects of the three. This script brings all three measures into a single bubble chart. Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper.
+[Artificial Analysis](https://artificialanalysis.ai/) charts compare two measures at a time. This makes it hard to see how intelligence, task time, and cost relate to each other. This userscript adds one bubble chart that shows all three. Higher bubbles mean more intelligence, bubbles farther left mean less time, and smaller bubbles mean lower cost.
 
-## Problem #2: There are too many models
+## Problem 2: More than 600 models crowd the charts
 
-Artificial Analysis has more than 600 models. If you turn on all models the chart becomes very crowded, making it impossible to see which model to pick. This script allows you to to automatically  **Hide dominated models** to hide any model that has an alternative at least as smart, fast, and cheap, and better on at least one measure. Set tolerance to 0% for exact comparisons, higher values also hide near matches (for example 5.6 Terra High is only very little cheaper than 6 Sol High but 6 Sol High considerably smarter, making Terra inferior choice despite having slightly cheaper cost)
+Artificial Analysis lists more than 600 models. Showing many models at once makes it hard to find a good choice. Turn on **Hide dominated models** to hide a selected model when another selected model is at least as intelligent, at least as fast, and no more expensive, with an improvement in at least one measure. Set **Tolerance** to 0% for this exact comparison. Raise it to hide near matches too: a model can be slightly worse on one measure if it is much better on another. For example, GPT-5.6 Terra (high) can be hidden by GPT-6 Sol (high) when Sol is much smarter and at least as fast, even if Terra costs a little less.
 
 **[Install from Greasy Fork](https://greasyfork.org/en/scripts/597690-artificial-analysis-intelligence-time-cost-bubbles)** · **[Chrome installation guide](CHROME-INSTALLATION.md)** · **[GitHub script file](artificial-analysis-3d-bubble.user.js)**
 
@@ -14,21 +14,21 @@ Artificial Analysis has more than 600 models. If you turn on all models the char
 
 ## What you can do
 
-- Set a minimum Intelligence Index and maximum time and cost with sliders or exact number fields. The chart updates while you move a slider.
-- Search by model or provider name. The search and filters also update AA's model selection in its other charts.
-- Open the same AA model picker from the custom chart.
+- Set a minimum Intelligence Index and maximum time and cost with sliders or number fields. The chart updates as you move a slider.
+- Search by model or provider. The search, sliders, and dominance filter also update AA's other charts.
+- Open the AA model picker from the new chart.
 - Show a dashed two-dimensional Pareto line and purple outlines for the exact three-dimensional Pareto set. Click the `?` buttons in the chart for explanations.
-- Hide dominated or nearly dominated models. At 0% tolerance, the comparison is exact. Open “Why models are hidden” to see the model and values behind each decision.
+- Open “Why models are hidden” to see which model and values caused each model to be hidden.
 - See which selected models have missing Intelligence Index, time, or cost data.
-- Select a bubble for exact values. Bubble targets support touch, mouse, and keyboard. On a phone, swipe the chart or use its left and right buttons.
+- Select a bubble to see its values. Bubbles support touch, mouse, and keyboard. On a phone, swipe the chart or use its left and right buttons.
 
-Settings are saved in this browser's `localStorage` and restored after a page reload. The “Clear filters” button restores the AA model selection you had before filtering.
+Settings are saved in your browser and restored after a page reload. **Clear filters** restores the AA model selection you had before filtering.
 
 ## Data and limits
 
-The script reads data from the open AA page. A model needs all three metrics to appear in the bubble chart. AA can change its page structure or data format, which may require a script update. Bubble sizes use a compressed scale for readability; select a bubble to see the exact cost.
+The script reads data from the open AA page. A model needs all three metrics to appear in the bubble chart. AA can change its page structure or data format, which may require a script update. Bubble sizes use a compressed scale for readability; select a bubble to see its cost as a number.
 
-The script does not send data to another server. Tampermonkey checks the source used for installation for updates: Greasy Fork for Greasy Fork installs, or GitHub for direct GitHub installs. This is an independent addition and is not an official Artificial Analysis feature.
+The script does not send data to another server. Tampermonkey checks GitHub for updates. This is an independent addition and is not an official Artificial Analysis feature.
 
 ## Files
 
