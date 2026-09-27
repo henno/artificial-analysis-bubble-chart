@@ -10,7 +10,7 @@ Artificial Analysis lists more than 600 models. Showing many models at once make
 
 **[Install from Greasy Fork](https://greasyfork.org/en/scripts/597690-artificialanalysis-io-compare-intelligence-time-and-cost)** · **[Chrome installation guide](CHROME-INSTALLATION.md)** · **[GitHub script file](artificial-analysis-3d-bubble.user.js)**
 
-![Artificial Analysis intelligence, time, and cost bubble chart](assets/chart-desktop.png)
+![Artificial Analysis intelligence, time, and cost bubble chart](https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/3c4e596803de7ca49777dea1709cca8b57add3ab/assets/chart-desktop.png)
 
 ## What you can do
 
