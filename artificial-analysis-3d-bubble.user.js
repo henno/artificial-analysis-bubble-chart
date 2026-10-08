@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.3
+// @version      2.5.4
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -671,7 +671,8 @@
       if (!p) continue;
       labelPositions.set(item.id, p.direction);
       const group = svgEl('g', { 'data-aa3d-callout': item.id, 'data-direction': p.direction, 'pointer-events': 'none', 'aria-hidden': 'true' });
-      const tipX = item.cx + p.ux * item.r, tipY = item.cy + p.uy * item.r;
+      const tipRadius = Math.max(0, item.r - 3);
+      const tipX = item.cx + p.ux * tipRadius, tipY = item.cy + p.uy * tipRadius;
       // Replace the nearest corner with the tail. One outline has no seam.
       const l = p.left, t = p.top, r = l + item.width, b = t + item.height;
       const tail = `L ${tipX} ${tipY}`;
@@ -729,7 +730,7 @@
     const defs = svgEl('defs'), gradient = svgEl('linearGradient', { id: 'aa3d-callout-fill', x2: 0, y2: 1 });
     gradient.append(svgEl('stop', { offset: 0, 'stop-color': '#fff' }), svgEl('stop', { offset: 1, 'stop-color': '#edf0f5' }));
     defs.append(gradient);
-    svg.append(defs, grid, frontier, leaders, bubbles, prices, labels, hits);
+    svg.append(defs, grid, frontier, bubbles, leaders, prices, labels, hits);
     for (let i = 0; i <= 5; i++) {
       const xv = minX + (maxX - minX) * i / 5, yv = minY + (maxY - minY) * i / 5;
       const x = xScale(xv), y = yScale(yv);
