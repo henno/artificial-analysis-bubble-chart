@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.1
+// @version      2.5.2
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -516,6 +516,19 @@
     }
   }
 
+  function modelNameParts(value, name, secondary = false) {
+    if (secondary || !/^(Claude\s|GPT[-\s])/i.test(name)) return [{ value, bold: false }];
+    const prefix = value.match(/^(Claude\s+|GPT[-\s]+)/i)?.[0] || '';
+    return [{ value: prefix, bold: false }, { value: value.slice(prefix.length), bold: true }];
+  }
+
+  function modelNameWidth(value, name, secondary, measure) {
+    return modelNameParts(value, name, secondary).reduce((width, part) => {
+      measure.font = `${part.bold ? '700 ' : ''}${secondary ? 10 : 11}px system-ui`;
+      return width + measure.measureText(part.value).width;
+    }, 0);
+  }
+
   function compactLabelRows(name, price, measure) {
     const variant = name.match(/^(.+?)\s+\((.+)\)$/);
     const rows = [];
@@ -524,7 +537,7 @@
       let line = '';
       for (const word of value.split(/\s+/)) {
         const next = line ? `${line} ${word}` : word;
-        if (line && measure.measureText(next).width > 175) { rows.push({ value: line, secondary }); line = word; }
+        if (line && modelNameWidth(next, name, secondary, measure) > 175) { rows.push({ value: line, secondary }); line = word; }
         else line = next;
       }
       if (line) rows.push({ value: line, secondary });
@@ -595,7 +608,7 @@
         item.priceInside = !!item.fontSize && !priceBoxes.some(box => boxesOverlap(box, priceBox, 2));
         if (item.priceInside) priceBoxes.push(priceBox);
         item.rows = compactLabelRows(item.name, item.priceInside ? '' : item.price, measure);
-        item.width = Math.max(...item.rows.map(row => textWidth(row.value + (row.price && row.value ? ' · ' : ''), `${row.secondary ? 10 : 11}px system-ui`) + (row.price ? textWidth(row.price, '600 10px system-ui') : 0))) + 16;
+        item.width = Math.max(...item.rows.map(row => modelNameWidth(row.value + (row.price && row.value ? ' · ' : ''), item.name, row.secondary, measure) + (row.price ? textWidth(row.price, '600 10px system-ui') : 0))) + 16;
         item.height = item.rows.length * 14 + 12;
       }
       let failed = 0;
@@ -675,7 +688,13 @@
       const text = svgEl('text', { 'data-aa3d-id': item.id, 'data-aa3d-name': item.name, fill: '#262626', 'font-size': 11 });
       item.rows.forEach((row, index) => {
         const line = svgEl('tspan', { x: p.left + 8, y: p.top + 16 + index * 14, 'font-size': row.secondary ? 10 : 11, fill: row.secondary ? '#555' : '#262626' });
-        line.textContent = row.value + (row.price && row.value ? ' · ' : '');
+        for (const part of modelNameParts(row.value, item.name, row.secondary)) {
+          if (!part.value) continue;
+          const span = svgEl('tspan', { 'font-weight': part.bold ? 700 : 400 });
+          span.textContent = part.value;
+          line.append(span);
+        }
+        if (row.price && row.value) line.append(document.createTextNode(' · '));
         if (row.price) { const price = svgEl('tspan', { 'data-aa3d-price-id': item.id, 'font-weight': 600, fill: '#171717' }); price.textContent = row.price; line.append(price); }
         text.append(line);
       });
