@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.21
+// @version      2.5.22
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -408,14 +408,39 @@
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
         bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. A price appears inside its bubble when it fits, or in the model label when it does not. The model variant is shown below the name. Labels appear in shaded callouts with diagonal pointers. The chart grows smoothly when labels need more space. Each price uses only enough decimal places to distinguish it from other visible prices, with at least cents and no trailing zeros. Free models show $0. Prices stay at the centre of small bubbles and can extend past their edge. If two prices overlap, one moves to its model callout. Select a bubble for model details. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
         dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. The Tolerance slider can also hide near matches. Open “Why models are hidden” below the filters for exact comparisons.',
-        tolerance: 'Tolerance controls how close another model must be to hide this one. At 0%, the other model must be at least as smart, as fast, and as cheap, with a strict improvement in one measure. Above 0%, it may be worse by up to the selected percentage in each measure, but its largest percentage improvement must exceed its largest percentage disadvantage. Each percentage is measured against the model being hidden. For example, at 4%, a model that is 20% faster and 4% more expensive can hide another model if it is at least as smart. Use a higher value to remove near matches when a large benefit matters more to you than a small trade-off. A higher value can only hide more models. The purple 3D Pareto outlines always use exact values.',
+        tolerance: [
+          ['Tolerance determines when one model can hide another.'],
+          ['At ', ['0%'], ', the other model must be at least as smart, fast, and cheap—and better in at least one.'],
+          ['At ', ['higher values'], ', small disadvantages are allowed if the biggest improvement outweighs the biggest drawback.'],
+          ['For example, at ', ['4%'], ", a model that's ", ['5% faster'], ' but ', ['4% more expensive'], ' can hide an equally smart model.'],
+          [['Higher tolerance hides more models.'], ' All percentages are ', ['relative to the model being hidden'], '. The purple 3D Pareto outlines always use ', ['exact values'], '.'],
+        ],
       };
       chart.querySelectorAll('[data-help]').forEach(button => button.addEventListener('click', () => {
         const panel = chart.querySelector('.aa3d-help');
         const open = button.getAttribute('aria-expanded') !== 'true';
         chart.querySelectorAll('[data-help]').forEach(item => item.setAttribute('aria-expanded', 'false'));
         panel.hidden = !open;
-        if (open) { panel.textContent = helpText[button.dataset.help]; button.setAttribute('aria-expanded', 'true'); }
+        if (open) {
+          const content = helpText[button.dataset.help];
+          panel.replaceChildren();
+          if (Array.isArray(content)) {
+            content.forEach(parts => {
+              const paragraph = document.createElement('p');
+              paragraph.style.margin = '0 0 .65rem';
+              parts.forEach(part => {
+                if (Array.isArray(part)) {
+                  const emphasis = document.createElement('strong');
+                  emphasis.textContent = part[0];
+                  paragraph.append(emphasis);
+                } else paragraph.append(document.createTextNode(part));
+              });
+              panel.append(paragraph);
+            });
+            panel.lastElementChild.style.marginBottom = '0';
+          } else panel.textContent = content;
+          button.setAttribute('aria-expanded', 'true');
+        }
       }));
       chart.querySelectorAll('input[data-control]').forEach(input => input.addEventListener('input', () => {
         if (input.dataset.control === 'search') state.search = input.value;
