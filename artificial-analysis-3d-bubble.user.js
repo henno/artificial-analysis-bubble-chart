@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.8
+// @version      2.5.9
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -758,7 +758,11 @@
 
     [...models].sort((a, b) => b.cost - a.cost).forEach(model => {
       const cx = xScale(model.time), cy = yScale(model.intelligence), r = radius(model.cost);
-      const circle = svgEl('circle', { cx, cy, r, fill: model.color, 'fill-opacity': .26, stroke: model.pareto3 ? '#7837aa' : model.color, 'stroke-opacity': model.pareto3 ? .9 : .45, 'stroke-width': model.pareto3 ? 2 : 1, 'data-aa3d-id': model.id, style: 'cursor:pointer' });
+      const gradientId = `aa3d-circle-gradient-${bubbles.childElementCount}`;
+      const gradient = svgEl('linearGradient', { id: gradientId, gradientUnits: 'userSpaceOnUse', x1: 0, y1: cy - r, x2: 0, y2: cy + r });
+      gradient.append(svgEl('stop', { offset: 0, 'stop-color': model.color, 'stop-opacity': .16 }), svgEl('stop', { offset: 1, 'stop-color': model.color, 'stop-opacity': .30 }));
+      bubbles.append(gradient);
+      const circle = svgEl('circle', { cx, cy, r, fill: `url(#${gradientId})`, stroke: model.pareto3 ? '#7837aa' : model.color, 'stroke-opacity': model.pareto3 ? .9 : .45, 'stroke-width': model.pareto3 ? 2 : 1, 'data-aa3d-id': model.id, style: 'cursor:pointer' });
       circle.setAttribute('pointer-events', 'none');
       bubbles.append(circle);
       const price = chartPrice(model.cost);
