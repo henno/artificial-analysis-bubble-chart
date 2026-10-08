@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.23
+// @version      2.5.24
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -665,8 +665,8 @@
         item.priceInside = !priceBoxes.some(box => boxesOverlap(box, priceBox, 2));
         if (item.priceInside) priceBoxes.push(priceBox);
         item.rows = compactLabelRows(item.name, item.priceInside ? '' : item.price, measure);
-        item.width = Math.max(...item.rows.map(row => modelNameWidth(row.value + (row.price && row.value ? ' · ' : ''), item.name, row.secondary, measure) + (row.price ? textWidth(row.price, '600 10px system-ui') : 0))) + 10;
-        item.height = item.rows.length * 14 + 6;
+        item.width = Math.max(...item.rows.map(row => modelNameWidth(row.value + (row.price && row.value ? ' · ' : ''), item.name, row.secondary, measure) + (row.price ? textWidth(row.price, '600 10px system-ui') : 0))) + 8;
+        item.height = item.rows.length * 14 + 4;
       }
       let failed = 0;
       for (const order of [1, -1]) {
@@ -901,7 +901,7 @@
       tails.append(svgEl('path', { d: outline, fill: `url(#${gradientId})`, stroke: '#cbd0d6', 'stroke-width': .7, 'stroke-linejoin': 'round', 'data-aa3d-tail': item.id, 'pointer-events': 'none' }));
       const text = svgEl('text', { 'data-aa3d-id': item.id, 'data-aa3d-name': item.name, fill: '#262626', 'font-size': 11 });
       item.rows.forEach((row, index) => {
-        const line = svgEl('tspan', { x: p.left + 5, y: p.top + 13 + index * 14, 'font-size': row.secondary ? 10 : 11, fill: row.secondary ? '#555' : '#262626' });
+        const line = svgEl('tspan', { x: p.left + 4, y: p.top + 12 + index * 14, 'font-size': row.secondary ? 10 : 11, fill: row.secondary ? '#555' : '#262626' });
         for (const part of modelNameParts(row.value, item.name, row.secondary)) {
           if (!part.value) continue;
           for (const token of part.value.split(/(\bmax\b)/i)) {
