@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.11
+// @version      2.5.12
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -555,6 +555,28 @@
     return rows;
   }
 
+  function calloutShapes(box, item, cornerX, cornerY, dx, dy, ux, uy) {
+    const distance = Math.hypot(cornerX - item.cx, cornerY - item.cy);
+    const tipRadius = item.r - Math.min(distance - item.r, item.r * .9);
+    return [
+      [[box.left, box.top], [box.right, box.top], [box.right, box.bottom], [box.left, box.bottom]],
+      [[cornerX + dx * 9, cornerY], [item.cx + ux * tipRadius, item.cy + uy * tipRadius], [cornerX, cornerY + dy * 9]]
+    ];
+  }
+
+  function polygonsOverlap(a, b) {
+    for (const polygon of [a, b]) {
+      for (let i = 0; i < polygon.length; i++) {
+        const point = polygon[i], next = polygon[(i + 1) % polygon.length];
+        const x = next[1] - point[1], y = point[0] - next[0];
+        const gap = 3 * Math.hypot(x, y);
+        const pa = a.map(p => p[0] * x + p[1] * y), pb = b.map(p => p[0] * x + p[1] * y);
+        if (Math.max(...pa) + gap < Math.min(...pb) || Math.max(...pb) + gap < Math.min(...pa)) return false;
+      }
+    }
+    return true;
+  }
+
   function boxesOverlap(a, b, gap = 4) {
     return a.left < b.right + gap && a.right > b.left - gap && a.top < b.bottom + gap && a.bottom > b.top - gap;
   }
@@ -604,7 +626,7 @@
       for (const item of items) bubbles.add({ left: item.cx - item.r - 3, right: item.cx + item.r + 3, top: item.cy - item.r - 3, bottom: item.cy + item.r + 3, item });
       for (const item of [...items].sort((a, b) => b.cost - a.cost)) {
         const priceWidth = textWidth(item.price, `600 ${item.fontSize || 11}px system-ui`);
-        const priceBox = { left: item.cx - priceWidth / 2, right: item.cx + priceWidth / 2, top: item.cy - 7, bottom: item.cy + 7 };
+        const priceBox = { priceId: item.id, left: item.cx - priceWidth / 2, right: item.cx + priceWidth / 2, top: item.cy - 7, bottom: item.cy + 7 };
         item.priceInside = !priceBoxes.some(box => boxesOverlap(box, priceBox, 2));
         if (item.priceInside) priceBoxes.push(priceBox);
         item.rows = compactLabelRows(item.name, item.priceInside ? '' : item.price, measure);
@@ -631,13 +653,20 @@
               const box = { left: cornerX - (dx < 0 ? item.width : 0), top: cornerY - (dy < 0 ? item.height : 0) };
               box.right = box.left + item.width; box.bottom = box.top + item.height;
               if (box.left < 30 || box.right > width - 8 || box.top < 8 || box.bottom > height - 82) continue;
-              if ([...labels.near(box)].some(other => boxesOverlap(box, other, 5))) continue;
+              const shapes = calloutShapes(box, item, cornerX, cornerY, dx, dy, ux, uy);
+              const points = shapes.flat();
+              const occupied = { left: Math.min(...points.map(p => p[0])) - 3, right: Math.max(...points.map(p => p[0])) + 3, top: Math.min(...points.map(p => p[1])) - 3, bottom: Math.max(...points.map(p => p[1])) + 3, shapes };
+              if ([...labels.near(occupied)].some(other => {
+                if (!boxesOverlap(occupied, other, 0)) return false;
+                const otherShapes = other.shapes || [[[other.left, other.top], [other.right, other.top], [other.right, other.bottom], [other.left, other.bottom]]];
+                return (other.priceId ? [shapes[0]] : shapes).some(a => otherShapes.some(b => polygonsOverlap(a, b)));
+              })) continue;
               if ([...bubbles.near(box)].some(other => {
                 const m = other.item, x = m.cx - Math.max(box.left, Math.min(m.cx, box.right)), y = m.cy - Math.max(box.top, Math.min(m.cy, box.bottom));
                 return x * x + y * y < (m.r + 3) ** 2;
               })) continue;
               item.position = { ...box, cornerX, cornerY, dx, dy, ux, uy, direction, gap };
-              labels.add(box);
+              labels.add(occupied);
               break search;
             }
           }
