@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.3.2
+// @version      2.3.3
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -290,7 +290,7 @@
         <div class="aa3d-legend"><span><i class="aa3d-example-dot"></i> Provider colour</span><span>Bubble diameter shows cost as a share of the highest visible cost. <button type="button" class="aa3d-help-button" data-help="bubbleSize" aria-label="Explain bubble size" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Dashed line: 2D Pareto <button type="button" class="aa3d-help-button" data-help="pareto2" aria-label="Explain 2D Pareto line" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Purple outline: 3D Pareto <button type="button" class="aa3d-help-button" data-help="pareto3" aria-label="Explain 3D Pareto outline" aria-controls="aa3d-help" aria-expanded="false">?</button></span><details><summary>Provider colours</summary><div class="aa3d-provider-list"></div></details></div>
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
-          <label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label>
+          <span class="aa3d-control-group"><label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label><button type="button" class="aa3d-help-button" data-help="tolerance" aria-label="Explain tolerance" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
@@ -373,7 +373,8 @@
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
         bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. Rounded prices appear inside bubbles when they fit. Select a bubble for the exact cost. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
-        dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. Tolerance also allows a disadvantage up to the selected percentage if the largest improvement is greater than the largest disadvantage. Example: at 4%, a model 20% faster can qualify even if it is 4% more expensive. Raising tolerance never brings a hidden model back. Open “Why models are hidden” below the filters for exact comparisons.',
+        dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. The Tolerance slider can also hide near matches. Open “Why models are hidden” below the filters for exact comparisons.',
+        tolerance: 'Tolerance controls how close another model must be to hide this one. At 0%, the other model must be at least as smart, as fast, and as cheap, with a strict improvement in one measure. Above 0%, it may be worse by up to the selected percentage in each measure, but its largest percentage improvement must exceed its largest percentage disadvantage. Each percentage is measured against the model being hidden. For example, at 4%, a model that is 20% faster and 4% more expensive can hide another model if it is at least as smart. Use a higher value to remove near matches when a large benefit matters more to you than a small trade-off. A higher value can only hide more models. The purple 3D Pareto outlines always use exact values.',
       };
       chart.querySelectorAll('[data-help]').forEach(button => button.addEventListener('click', () => {
         const panel = chart.querySelector('.aa3d-help');
