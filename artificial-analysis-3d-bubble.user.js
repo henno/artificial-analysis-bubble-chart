@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.12
+// @version      2.5.13
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -636,8 +636,9 @@
       let failed = 0;
       for (const order of [1, -1]) {
         const labels = spatialIndex();
-        for (let tick = 0; tick <= 5; tick++) {
-          const value = minY + (maxY - minY) * tick / 5, y = yScale(value);
+        const tickCount = Math.max(5, Math.ceil((plot.bottom - plot.top) / 240));
+        for (let tick = 0; tick <= tickCount; tick++) {
+          const value = minY + (maxY - minY) * tick / tickCount, y = yScale(value);
           labels.add({ left: plot.left - 12 - textWidth(value.toFixed(0), '10px system-ui'), right: plot.left - 5, top: y - 9, bottom: y + 6 });
         }
         for (const box of priceBoxes) labels.add(box);
@@ -767,13 +768,24 @@
 
     const grid = svgEl('g'), frontier = svgEl('g'), leaders = svgEl('g'), bubbles = svgEl('g'), prices = svgEl('g'), labels = svgEl('g'), hits = svgEl('g');
     svg.append(grid, frontier, bubbles, leaders, prices, labels, hits);
-    for (let i = 0; i <= 5; i++) {
-      const xv = minX + (maxX - minX) * i / 5, yv = minY + (maxY - minY) * i / 5;
-      const x = xScale(xv), y = yScale(yv);
-      grid.append(svgEl('line', { x1: x, y1: plot.top, x2: x, y2: plot.bottom, stroke: '#e6e6e6' }));
+    const yTickCount = Math.max(5, Math.ceil((plot.bottom - plot.top) / 240));
+    for (let i = 0; i <= yTickCount; i++) {
+      const value = minY + (maxY - minY) * i / yTickCount, y = yScale(value);
       grid.append(svgEl('line', { x1: plot.left, y1: y, x2: plot.right, y2: y, stroke: '#e6e6e6' }));
-      const xt = svgEl('text', { x, y: plot.bottom + 18, 'text-anchor': 'middle', 'font-size': 10, fill: '#666' }); xt.textContent = xv.toFixed(xv < 10 ? 1 : 0); grid.append(xt);
-      const yt = svgEl('text', { x: plot.left - 8, y: y + 3, 'text-anchor': 'end', 'font-size': 10, fill: '#666' }); yt.textContent = yv.toFixed(0); grid.append(yt);
+      const label = svgEl('text', { x: plot.left - 8, y: y + 3, 'text-anchor': 'end', 'font-size': 10, fill: '#666' });
+      label.textContent = `${value.toFixed((maxY - minY) / yTickCount < 1 ? 1 : 0)} index`;
+      grid.append(label);
+    }
+    for (let i = 0; i <= 5; i++) {
+      const value = minX + (maxX - minX) * i / 5, x = xScale(value);
+      grid.append(svgEl('line', { x1: x, y1: plot.top, x2: x, y2: plot.bottom, stroke: '#e6e6e6' }));
+      const positions = [plot.bottom + 18];
+      if (height > 900) for (let y = plot.top + 18; y < plot.bottom - 40; y += 400) positions.push(y);
+      for (const y of positions) {
+        const label = svgEl('text', { x, y, 'text-anchor': 'middle', 'font-size': 10, fill: '#666', stroke: '#fff', 'stroke-width': 3, 'paint-order': 'stroke', 'pointer-events': 'none', 'data-aa3d-time-tick': '' });
+        label.textContent = `${value.toFixed(value < 10 ? 1 : 0)} min`;
+        grid.append(label);
+      }
     }
     grid.append(svgEl('line', { x1: plot.left, y1: plot.bottom, x2: plot.right, y2: plot.bottom, stroke: '#999' }));
     grid.append(svgEl('line', { x1: plot.left, y1: plot.top, x2: plot.left, y2: plot.bottom, stroke: '#999' }));
