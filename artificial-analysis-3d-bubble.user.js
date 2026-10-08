@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.16
+// @version      2.5.17
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -709,7 +709,7 @@
     const cuts = [];
     for (let i = 1; i < merged.length; i++) {
       const start = merged[i - 1].bottom, end = merged[i].top;
-      if (end - start > 48) cuts.push({ start, end, remove: end - start - 48 });
+      if (end - start > 12) cuts.push({ start, end, remove: end - start - 12 });
     }
     const mapY = y => y - cuts.reduce((sum, cut) => sum +
       (y <= cut.start ? 0 : y >= cut.end ? cut.remove : (y - cut.start) * cut.remove / (cut.end - cut.start)), 0);
