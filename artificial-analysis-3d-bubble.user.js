@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.14
+// @version      2.5.15
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -603,8 +603,8 @@
   function arrangeCallouts(models, width, measure, chartPrice, radius) {
     const minX = Math.max(0, Math.min(...models.map(m => m.time)) - 1);
     const maxX = Math.max(...models.map(m => m.time)) + 1;
-    const minY = Math.min(...models.map(m => m.intelligence)) - 3;
-    const maxY = Math.max(...models.map(m => m.intelligence)) + 3;
+    const minY = Math.min(...models.map(m => m.intelligence));
+    const maxY = Math.max(minY + .01, ...models.map(m => m.intelligence));
     const widths = new Map();
     const textWidth = (text, font) => {
       const key = `${font}:${text}`;
@@ -625,7 +625,7 @@
     let result;
     // Try numeric layouts before creating SVG elements. Each pass has a fixed limit.
     for (let pass = 0; pass < 12; pass++) {
-      const plot = { left: 215, right: width - 200, top: 65, bottom: height - 75 };
+      const plot = { left: 215, right: width - 200, top: 110, bottom: height - 110 };
       const xScale = value => plot.left + (value - minX) / (maxX - minX) * (plot.right - plot.left);
       const yScale = value => plot.bottom - (value - minY) / (maxY - minY) * (plot.bottom - plot.top);
       const bubbles = spatialIndex(), priceBoxes = [];
