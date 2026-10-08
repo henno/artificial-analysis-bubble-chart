@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.20
+// @version      2.5.21
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -324,7 +324,7 @@
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label><button type="button" class="aa3d-help-button" data-help="tolerance" aria-label="Explain tolerance" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
-          <label title="Remove empty vertical bands. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
+          <label title="Reduce vertical space without overlapping model labels. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
@@ -635,6 +635,7 @@
       for (const item of items) bubbles.add({ left: item.cx - item.r - 3, right: item.cx + item.r + 3, top: item.cy - item.r - 3, bottom: item.cy + item.r + 3, item });
       for (const item of [...items].sort((a, b) => b.cost - a.cost)) {
         const priceWidth = textWidth(item.price, `600 ${item.fontSize || 11}px system-ui`);
+        item.priceWidth = priceWidth;
         const priceBox = { priceId: item.id, left: item.cx - priceWidth / 2, right: item.cx + priceWidth / 2, top: item.cy - 7, bottom: item.cy + 7 };
         item.priceInside = !priceBoxes.some(box => boxesOverlap(box, priceBox, 2));
         if (item.priceInside) priceBoxes.push(priceBox);
@@ -687,46 +688,80 @@
       if (!failed) break;
       height = Math.ceil(height * 1.4);
     }
-    if (state.compactVertical) { compactVerticalLayout(result); spaceIntelligenceTicks(result); }
+    if (state.compactVertical) compactVerticalLayout(result);
     return result;
   }
 
   function compactVerticalLayout(layout) {
-    const bandsLayout = { ...layout, plot: { ...layout.plot }, items: layout.items.map(item => ({ ...item, position: item.position ? { ...item.position } : null })) };
-    compactEmptyBands(bandsLayout);
-    // Pack model groups from highest to lowest intelligence. Horizontal bounds
-    // reserve space only where a circle, price, body, or tail can be present.
-    const groups = [];
-    for (const item of [...layout.items].sort((a, b) => b.intelligence - a.intelligence)) {
-      let group = groups[groups.length - 1];
-      if (!group || group.value !== item.intelligence) {
-        group = { value: item.intelligence, items: [] };
-        groups.push(group);
-      }
-      const p = item.position;
-      group.items.push({ item,
-        left: Math.min(item.cx - Math.max(item.r, 24), p?.left ?? item.cx),
-        right: Math.max(item.cx + Math.max(item.r, 24), p?.right ?? item.cx),
-        top: Math.min(-Math.max(item.r, 9), (p?.top ?? item.cy) - item.cy),
-        bottom: Math.max(Math.max(item.r, 9), (p?.bottom ?? item.cy) - item.cy) });
+    // Pack separate circle, price, body, and tail shapes. Empty space between
+    // those shapes does not reserve a full rectangular column.
+    const byValue = new Map();
+    for (const item of layout.items) {
+      if (!byValue.has(item.intelligence)) byValue.set(item.intelligence, { value: item.intelligence, items: [] });
+      byValue.get(item.intelligence).items.push(item);
     }
+    // Place axis ticks in the same pass. Moving models later to make room
+    // for ticks can cause a new collision between interleaved shapes.
+    for (const value of integerTicks(layout.minY, layout.maxY, Math.ceil(layout.maxY - layout.minY) + 1)) {
+      if (!byValue.has(value)) byValue.set(value, { value, items: [] });
+      byValue.get(value).tick = true;
+    }
+    const groups = [...byValue.values()].sort((a, b) => b.value - a.value);
     const placed = [];
+    let previousY = 108, lastTick = -Infinity;
     for (const group of groups) {
-      let cy = Math.max(110, placed.length ? placed[placed.length - 1].cy + 2 : 110);
-      for (const box of group.items) {
-        cy = Math.max(cy, 8 - box.top);
-        for (const previous of placed) {
-          if (box.left < previous.right + 8 && box.right > previous.left - 8)
-            cy = Math.max(cy, previous.cy + previous.bottom - box.top + 8);
+      const minimumY = Math.max(110, previousY + 2, group.tick ? lastTick + 20 : 0);
+      const fit = shapes => {
+        let cy = Math.max(minimumY, 8 - Math.min(...shapes.map(shape => shape.top)));
+        const blocked = [];
+        for (const shape of shapes) {
+          for (const previous of placed) {
+            if (shape.left > previous.right + 4 || shape.right < previous.left - 4) continue;
+            const interval = verticalCollisionInterval(shape, previous, cy);
+            if (interval && interval.end > cy) blocked.push(interval);
+          }
         }
+        blocked.sort((a, b) => a.start - b.start);
+        for (const interval of blocked) {
+          if (interval.start > cy) break;
+          if (interval.end >= cy) cy = interval.end + .01;
+        }
+        return cy;
+      };
+      let shapes = group.items.flatMap(compactShapes), cy = fit(shapes);
+      // A short tail can fit beside earlier models. Try both right diagonals
+      // before accepting the label offset from the linear chart.
+      if (group.items.length === 1 && group.items[0].position) {
+        const item = group.items[0];
+        let bestPosition = item.position;
+        let bestScore = cy + Math.max(...shapes.map(shape => shape.bottom)) * .25;
+        for (const dy of [-1, 1]) for (const angle of [45, 25, 65]) {
+          const ux = Math.cos(angle * Math.PI / 180), uy = dy * Math.sin(angle * Math.PI / 180);
+          const cornerX = item.cx + ux * (item.r + 9), cornerY = item.cy + uy * (item.r + 9);
+          const left = cornerX, top = cornerY - (dy < 0 ? item.height : 0);
+          if (left + item.width > layout.width - 8) continue;
+          const position = { left, right: left + item.width, top, bottom: top + item.height,
+            cornerX, cornerY, dx: 1, dy, ux, uy, direction: dy < 0 ? 'NE' : 'SE', gap: 9 };
+          if (item.priceInside && boxesOverlap(position, { left: item.cx - item.priceWidth / 2 - 2,
+            right: item.cx + item.priceWidth / 2 + 2, top: item.cy - 8, bottom: item.cy + 8 }, 3)) continue;
+          item.position = position;
+          const candidateShapes = compactShapes(item), candidateY = fit(candidateShapes);
+          const score = candidateY + Math.max(...candidateShapes.map(shape => shape.bottom)) * .25;
+          if (score < bestScore - .01) {
+            bestScore = score; bestPosition = position; shapes = candidateShapes; cy = candidateY;
+          }
+        }
+        item.position = bestPosition;
       }
       group.cy = cy;
-      for (const box of group.items) {
-        const shift = cy - box.item.cy;
-        box.item.cy = cy;
-        if (box.item.position) for (const key of ['top', 'bottom', 'cornerY']) box.item.position[key] += shift;
-        placed.push({ ...box, cy });
+      previousY = cy;
+      if (group.tick) lastTick = cy;
+      for (const item of group.items) {
+        const shift = cy - item.cy;
+        item.cy = cy;
+        if (item.position) for (const key of ['top', 'bottom', 'cornerY']) item.position[key] += shift;
       }
+      placed.push(...shapes.map(shape => polygonShape(shape.points.map(([x, y]) => [x, y + cy]))));
     }
     layout.yScale = value => {
       if (value >= groups[0].value) return groups[0].cy;
@@ -739,73 +774,62 @@
     };
     layout.plot.top = groups[0].cy;
     layout.plot.bottom = groups[groups.length - 1].cy;
-    layout.height = Math.max(560, ...placed.map(box => box.cy + box.bottom + 110));
-    if (bandsLayout.height < layout.height) Object.assign(layout, bandsLayout);
+    layout.height = Math.max(560, ...placed.map(shape => shape.bottom + 110));
   }
 
-  function compactEmptyBands(layout) {
-    // Remove only bands that contain no circle, price, callout body, or tail.
-    // Every occupied band moves as a unit, so shapes and their gaps stay intact.
-    const bands = layout.items.map(item => {
+  function polygonShape(points) {
+    const axes = points.map((p, i) => {
+      const next = points[(i + 1) % points.length];
+      return [next[1] - p[1], p[0] - next[0]];
+    });
+    return { points, left: Math.min(...points.map(p => p[0])), right: Math.max(...points.map(p => p[0])),
+      top: Math.min(...points.map(p => p[1])), bottom: Math.max(...points.map(p => p[1])), axes };
+  }
+
+  function compactShapes(item) {
+    const shapes = [];
+    // Use a polygon outside the circle, so the collision margin is safe.
+    const r = (item.r + 1) / Math.cos(Math.PI / 16);
+    shapes.push(Array.from({ length: 16 }, (_, i) => [item.cx + r * Math.cos(i * Math.PI / 8), r * Math.sin(i * Math.PI / 8)]));
+    if (item.priceInside) {
+      const half = item.priceWidth / 2 + 2;
+      shapes.push([[item.cx - half, -8], [item.cx + half, -8], [item.cx + half, 8], [item.cx - half, 8]]);
+    }
+    if (item.position) {
       const p = item.position;
-      return { top: Math.min(item.cy - Math.max(item.r, 9), p?.top ?? item.cy),
-        bottom: Math.max(item.cy + Math.max(item.r, 9), p?.bottom ?? item.cy) };
-    }).sort((a, b) => a.top - b.top);
-    const merged = [];
-    for (const band of bands) {
-      const last = merged[merged.length - 1];
-      if (last && band.top <= last.bottom) last.bottom = Math.max(last.bottom, band.bottom);
-      else merged.push({ ...band });
+      shapes.push(...calloutShapes(p, item, p.cornerX, p.cornerY, p.dx, p.dy, p.ux, p.uy)
+        .map(points => points.map(([x, y]) => [x, y - item.cy])));
     }
-    const cuts = [];
-    for (let i = 1; i < merged.length; i++) {
-      const start = merged[i - 1].bottom, end = merged[i].top;
-      if (end - start > 12) cuts.push({ start, end, remove: end - start - 12 });
-    }
-    const mapY = y => y - cuts.reduce((sum, cut) => sum +
-      (y <= cut.start ? 0 : y >= cut.end ? cut.remove : (y - cut.start) * cut.remove / (cut.end - cut.start)), 0);
-    const oldTop = layout.plot.top, oldBottom = layout.plot.bottom;
-    layout.yScale = value => mapY(oldBottom - (value - layout.minY) / (layout.maxY - layout.minY) * (oldBottom - oldTop));
-    for (const item of layout.items) {
-      const shift = mapY(item.cy) - item.cy;
-      item.cy += shift;
-      if (item.position) for (const key of ['top', 'bottom', 'cornerY']) item.position[key] += shift;
-    }
-    layout.plot.top = mapY(layout.plot.top);
-    layout.plot.bottom = mapY(layout.plot.bottom);
-    layout.height -= cuts.reduce((sum, cut) => sum + cut.remove, 0);
+    return shapes.map(polygonShape);
   }
 
-  function spaceIntelligenceTicks(layout) {
-    // Expand crowded axis intervals. Never reduce an existing model gap.
-    const scale = layout.yScale;
-    const anchors = [...layout.items.map(item => ({ y: item.cy })),
-      ...integerTicks(layout.minY, layout.maxY, Math.ceil(layout.maxY - layout.minY) + 1)
-        .map(value => ({ y: scale(value), tick: true }))].sort((a, b) => a.y - b.y);
-    let previous, lastTick = -Infinity;
-    for (const anchor of anchors) {
-      anchor.target = previous ? previous.target + anchor.y - previous.y : anchor.y;
-      if (anchor.tick) { anchor.target = Math.max(anchor.target, lastTick + 20); lastTick = anchor.target; }
-      previous = anchor;
-    }
-    const mapY = y => {
-      if (y <= anchors[0].y) return y + anchors[0].target - anchors[0].y;
-      for (let i = 1; i < anchors.length; i++) {
-        const a = anchors[i - 1], b = anchors[i];
-        if (y <= b.y) return b.y === a.y ? b.target : a.target + (y - a.y) / (b.y - a.y) * (b.target - a.target);
+  function verticalCollisionInterval(moving, fixed, minimumY) {
+    let start = fixed.top - moving.bottom - 4, end = fixed.bottom - moving.top + 4;
+    if (end < minimumY) return null;
+    for (const axes of [moving.axes, fixed.axes]) {
+      for (const [x, y] of axes) {
+        const gap = 4 * Math.hypot(x, y);
+        let minMoving = Infinity, maxMoving = -Infinity, minFixed = Infinity, maxFixed = -Infinity;
+        for (const point of moving.points) {
+          const projection = point[0] * x + point[1] * y;
+          minMoving = Math.min(minMoving, projection); maxMoving = Math.max(maxMoving, projection);
+        }
+        for (const point of fixed.points) {
+          const projection = point[0] * x + point[1] * y;
+          minFixed = Math.min(minFixed, projection); maxFixed = Math.max(maxFixed, projection);
+        }
+        const lower = minFixed - gap - maxMoving;
+        const upper = maxFixed + gap - minMoving;
+        if (Math.abs(y) < 1e-9) {
+          if (lower > 0 || upper < 0) return null;
+        } else {
+          start = Math.max(start, Math.min(lower / y, upper / y));
+          end = Math.min(end, Math.max(lower / y, upper / y));
+          if (start > end || end < minimumY) return null;
+        }
       }
-      const last = anchors[anchors.length - 1];
-      return y + last.target - last.y;
-    };
-    layout.yScale = value => mapY(scale(value));
-    for (const item of layout.items) {
-      const shift = mapY(item.cy) - item.cy;
-      item.cy += shift;
-      if (item.position) for (const key of ['top', 'bottom', 'cornerY']) item.position[key] += shift;
     }
-    layout.plot.top = mapY(layout.plot.top);
-    layout.plot.bottom = mapY(layout.plot.bottom);
-    layout.height = mapY(layout.height);
+    return { start, end };
   }
 
   function resizePlot(height) {
