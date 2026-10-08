@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.6
+// @version      2.5.7
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -688,7 +688,8 @@
         ` V ${t + (p.direction === 'SE' ? 9 : 5)}` +
         (p.direction === 'SE' ? ` ${tail} L ${l + 9} ${t}` : ` Q ${l} ${t} ${l + 5} ${t}`) + ' Z';
       tails.append(svgEl('path', { d: outline, transform: 'translate(1 2)', fill: '#000', opacity: .10, 'pointer-events': 'none' }));
-      tails.append(svgEl('path', { d: outline, fill: 'url(#aa3d-callout-fill)', stroke: '#cbd0d6', 'stroke-width': .7, 'stroke-linejoin': 'round', 'data-aa3d-tail': item.id, 'pointer-events': 'none' }));
+      tails.append(svgEl('path', { d: outline, fill: '#fff', 'pointer-events': 'none' }));
+      tails.append(svgEl('path', { d: outline, fill: item.color, 'fill-opacity': .26, stroke: item.color, 'stroke-opacity': .45, 'stroke-width': .7, 'stroke-linejoin': 'round', 'data-aa3d-tail': item.id, 'pointer-events': 'none' }));
       const text = svgEl('text', { 'data-aa3d-id': item.id, 'data-aa3d-name': item.name, fill: '#262626', 'font-size': 11 });
       item.rows.forEach((row, index) => {
         const line = svgEl('tspan', { x: p.left + 8, y: p.top + 16 + index * 14, 'font-size': row.secondary ? 10 : 11, fill: row.secondary ? '#555' : '#262626' });
@@ -732,10 +733,7 @@
     models.forEach(m => { m.pareto2 = pareto2.has(m.id); m.pareto3 = pareto3.has(m.id); });
 
     const grid = svgEl('g'), frontier = svgEl('g'), leaders = svgEl('g'), bubbles = svgEl('g'), prices = svgEl('g'), labels = svgEl('g'), hits = svgEl('g');
-    const defs = svgEl('defs'), gradient = svgEl('linearGradient', { id: 'aa3d-callout-fill', x2: 0, y2: 1 });
-    gradient.append(svgEl('stop', { offset: 0, 'stop-color': '#fff' }), svgEl('stop', { offset: 1, 'stop-color': '#edf0f5' }));
-    defs.append(gradient);
-    svg.append(defs, grid, frontier, bubbles, leaders, prices, labels, hits);
+    svg.append(grid, frontier, bubbles, leaders, prices, labels, hits);
     for (let i = 0; i <= 5; i++) {
       const xv = minX + (maxX - minX) * i / 5, yv = minY + (maxY - minY) * i / 5;
       const x = xScale(xv), y = yScale(yv);
