@@ -18,7 +18,7 @@ Artificial Analysis lists more than 600 models. Showing many models at once make
 
 - Set a minimum Intelligence Index and maximum time and cost with sliders or number fields. The chart updates as you move a slider.
 - Search by model or provider. Turn on **Regex** to use a pattern such as `(Claude)|(GPT)`; matching ignores case. The chart shows an error if the pattern is invalid. The search, sliders, and dominance filter also update AA's other charts.
-- The most expensive visible model has the largest bubble. Other bubble areas follow their cost as a share of that model's cost. Very small bubbles keep a visible marker.
+- The most expensive visible model has the largest bubble. Other bubble diameters follow their cost as a share of that model's cost. A model at half the cost has a bubble half as wide. Very small bubbles keep a visible marker.
 - Open the AA model picker from the new chart.
 - See a dashed two-dimensional Pareto line and purple outlines for the exact three-dimensional Pareto set. Click the `?` buttons in the chart for explanations.
 - Open “Why models are hidden” to see which model and values caused each model to be hidden.
@@ -29,7 +29,7 @@ Settings are saved in your browser and restored after a page reload. **Clear fil
 
 ## Data and limits
 
-The script reads data from the open AA page. A model needs all three metrics to appear in the bubble chart. AA can change its page structure or data format, which may require a script update. Bubble sizes use the highest cost among currently visible models. Select a bubble to see its cost as a number.
+The script reads data from the open AA page. A model needs all three metrics to appear in the bubble chart. AA can change its page structure or data format, which may require a script update. Bubble diameters use the highest cost among currently visible models. Select a bubble to see its cost as a number.
 
 The script does not send data to another server. Tampermonkey checks GitHub for updates. This is an independent addition and is not an official Artificial Analysis feature.
 

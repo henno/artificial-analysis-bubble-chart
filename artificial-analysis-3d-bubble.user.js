@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.3.0
+// @version      2.3.1
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -287,7 +287,7 @@
       chart.lang = 'en';
       chart.innerHTML = `
         <div class="aa3d-head"><div><h3>Intelligence Index vs. Time per Task</h3><p>Higher = smarter · Left = faster · Smaller bubble = cheaper. Select a bubble for exact values.</p></div><div class="aa3d-picker-wrap"><span>AA model selection</span><button type="button" class="aa3d-model-picker" aria-label="Select AA models" aria-haspopup="dialog" aria-expanded="false" disabled><span>Select models</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg></button></div></div>
-        <div class="aa3d-legend"><span><i class="aa3d-example-dot"></i> Provider colour</span><span>Bubble area shows cost as a share of the highest visible cost. <button type="button" class="aa3d-help-button" data-help="bubbleSize" aria-label="Explain bubble size" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Dashed line: 2D Pareto <button type="button" class="aa3d-help-button" data-help="pareto2" aria-label="Explain 2D Pareto line" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Purple outline: 3D Pareto <button type="button" class="aa3d-help-button" data-help="pareto3" aria-label="Explain 3D Pareto outline" aria-controls="aa3d-help" aria-expanded="false">?</button></span><details><summary>Provider colours</summary><div class="aa3d-provider-list"></div></details></div>
+        <div class="aa3d-legend"><span><i class="aa3d-example-dot"></i> Provider colour</span><span>Bubble diameter shows cost as a share of the highest visible cost. <button type="button" class="aa3d-help-button" data-help="bubbleSize" aria-label="Explain bubble size" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Dashed line: 2D Pareto <button type="button" class="aa3d-help-button" data-help="pareto2" aria-label="Explain 2D Pareto line" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Purple outline: 3D Pareto <button type="button" class="aa3d-help-button" data-help="pareto3" aria-label="Explain 3D Pareto outline" aria-controls="aa3d-help" aria-expanded="false">?</button></span><details><summary>Provider colours</summary><div class="aa3d-provider-list"></div></details></div>
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label>
@@ -305,7 +305,7 @@
         <div class="aa3d-status" role="status"></div>
         <details class="aa3d-missing" hidden><summary></summary><ul></ul></details><details class="aa3d-hidden-models" hidden><summary></summary><ul></ul></details>
         <div class="aa3d-mobile-nav"><span>Swipe horizontally to see more</span><button type="button" data-pan="left" aria-label="Scroll chart left">←</button><button type="button" data-pan="right" aria-label="Scroll chart right">→</button></div>
-        <div class="aa3d-plot"><svg role="group" aria-label="Intelligence Index by Time per Task; bubble size shows Cost per Task"></svg><div class="aa3d-tip" id="aa3d-tooltip" role="tooltip" hidden></div></div>`;
+        <div class="aa3d-plot"><svg role="group" aria-label="Intelligence Index by Time per Task; bubble diameter shows Cost per Task"></svg><div class="aa3d-tip" id="aa3d-tooltip" role="tooltip" hidden></div></div>`;
       const style = document.createElement('style');
       style.textContent = `
         #${ID}{margin-top:1.5rem;padding:1rem;border:1px solid #e5e5e5;border-radius:.5rem;background:#fff;color:#171717;font:13px system-ui,sans-serif}
@@ -372,7 +372,7 @@
       const helpText = {
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
-        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half the bubble area. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
+        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
         dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. Tolerance also allows a disadvantage up to the selected percentage if the largest improvement is greater than the largest disadvantage. Example: at 4%, a model 20% faster can qualify even if it is 4% more expensive. Raising tolerance never brings a hidden model back. Open “Why models are hidden” below the filters for exact comparisons.',
       };
       chart.querySelectorAll('[data-help]').forEach(button => button.addEventListener('click', () => {
@@ -544,8 +544,8 @@
     plot.right = Math.max(plot.left + 40, plot.right);
     const xScale = value => plot.left + (value - minX) / (maxX - minX) * (plot.right - plot.left);
     const yScale = value => plot.bottom - (value - minY) / (maxY - minY) * (plot.bottom - plot.top);
-    // Circle area follows the cost ratio. Keep a small visible marker for low costs.
-    const radius = cost => maxCost === 0 ? 43 : Math.max(3, 43 * Math.sqrt(cost / maxCost));
+    // Circle diameter follows the cost ratio. Keep a small visible marker for low costs.
+    const radius = cost => maxCost === 0 ? 43 : Math.max(3, 43 * cost / maxCost);
     const pareto2 = new Set(compute2DPareto(models).map(m => m.id));
     const pareto3 = new Set(compute3DPareto(models).map(m => m.id));
     models.forEach(m => { m.pareto2 = pareto2.has(m.id); m.pareto3 = pareto3.has(m.id); });
