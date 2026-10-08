@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.4
+// @version      2.5.5
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -671,7 +671,9 @@
       if (!p) continue;
       labelPositions.set(item.id, p.direction);
       const group = svgEl('g', { 'data-aa3d-callout': item.id, 'data-direction': p.direction, 'pointer-events': 'none', 'aria-hidden': 'true' });
-      const tipRadius = Math.max(0, item.r - 3);
+      // Put the circle edge near the tail midpoint. Keep the tip inside small circles.
+      const cornerDistance = Math.hypot(p.cornerX - item.cx, p.cornerY - item.cy);
+      const tipRadius = item.r - Math.min(cornerDistance - item.r, item.r * .9);
       const tipX = item.cx + p.ux * tipRadius, tipY = item.cy + p.uy * tipRadius;
       // Replace the nearest corner with the tail. One outline has no seam.
       const l = p.left, t = p.top, r = l + item.width, b = t + item.height;
