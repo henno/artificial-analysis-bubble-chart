@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.18
+// @version      2.5.19
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -645,8 +645,7 @@
       let failed = 0;
       for (const order of [1, -1]) {
         const labels = spatialIndex();
-        const tickCount = Math.max(5, Math.ceil((plot.bottom - plot.top) / 240));
-        for (const value of integerTicks(minY, maxY, tickCount)) {
+        for (const value of integerTicks(minY, maxY, Math.ceil(maxY - minY) + 1)) {
           const y = yScale(value);
           labels.add({ left: plot.left - 12 - textWidth(value.toFixed(0), '10px system-ui'), right: plot.left - 5, top: y - 9, bottom: y + 6 });
         }
@@ -863,12 +862,11 @@
 
     const grid = svgEl('g'), frontier = svgEl('g'), leaders = svgEl('g'), bubbles = svgEl('g'), prices = svgEl('g'), labels = svgEl('g'), hits = svgEl('g');
     svg.append(grid, frontier, bubbles, leaders, prices, labels, hits);
-    const yTickCount = Math.max(5, Math.ceil((plot.bottom - plot.top) / 240));
-    for (const value of integerTicks(minY, maxY, yTickCount)) {
+    for (const value of integerTicks(minY, maxY, Math.ceil(maxY - minY) + 1)) {
       const y = yScale(value);
       grid.append(svgEl('line', { x1: plot.left, y1: y, x2: plot.right, y2: y, stroke: '#e6e6e6' }));
       const label = svgEl('text', { x: plot.left - 8, y: y + 3, 'text-anchor': 'end', 'font-size': 10, fill: '#666' });
-      label.textContent = `${value} index`;
+      label.textContent = `${value}`;
       grid.append(label);
     }
     for (const value of integerTicks(minX, maxX, 5)) {
