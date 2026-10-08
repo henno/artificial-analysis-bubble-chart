@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.17
+// @version      2.5.18
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -693,6 +693,58 @@
   }
 
   function compactVerticalLayout(layout) {
+    const bandsLayout = { ...layout, plot: { ...layout.plot }, items: layout.items.map(item => ({ ...item, position: item.position ? { ...item.position } : null })) };
+    compactEmptyBands(bandsLayout);
+    // Pack model groups from highest to lowest intelligence. Horizontal bounds
+    // reserve space only where a circle, price, body, or tail can be present.
+    const groups = [];
+    for (const item of [...layout.items].sort((a, b) => b.intelligence - a.intelligence)) {
+      let group = groups[groups.length - 1];
+      if (!group || group.value !== item.intelligence) {
+        group = { value: item.intelligence, items: [] };
+        groups.push(group);
+      }
+      const p = item.position;
+      group.items.push({ item,
+        left: Math.min(item.cx - Math.max(item.r, 24), p?.left ?? item.cx),
+        right: Math.max(item.cx + Math.max(item.r, 24), p?.right ?? item.cx),
+        top: Math.min(-Math.max(item.r, 9), (p?.top ?? item.cy) - item.cy),
+        bottom: Math.max(Math.max(item.r, 9), (p?.bottom ?? item.cy) - item.cy) });
+    }
+    const placed = [];
+    for (const group of groups) {
+      let cy = Math.max(110, placed.length ? placed[placed.length - 1].cy + 2 : 110);
+      for (const box of group.items) {
+        cy = Math.max(cy, 8 - box.top);
+        for (const previous of placed) {
+          if (box.left < previous.right + 8 && box.right > previous.left - 8)
+            cy = Math.max(cy, previous.cy + previous.bottom - box.top + 8);
+        }
+      }
+      group.cy = cy;
+      for (const box of group.items) {
+        const shift = cy - box.item.cy;
+        box.item.cy = cy;
+        if (box.item.position) for (const key of ['top', 'bottom', 'cornerY']) box.item.position[key] += shift;
+        placed.push({ ...box, cy });
+      }
+    }
+    layout.yScale = value => {
+      if (value >= groups[0].value) return groups[0].cy;
+      for (let i = 1; i < groups.length; i++) {
+        const upper = groups[i - 1], lower = groups[i];
+        if (value >= lower.value) return upper.cy +
+          (upper.value - value) / (upper.value - lower.value) * (lower.cy - upper.cy);
+      }
+      return groups[groups.length - 1].cy;
+    };
+    layout.plot.top = groups[0].cy;
+    layout.plot.bottom = groups[groups.length - 1].cy;
+    layout.height = Math.max(560, ...placed.map(box => box.cy + box.bottom + 110));
+    if (bandsLayout.height < layout.height) Object.assign(layout, bandsLayout);
+  }
+
+  function compactEmptyBands(layout) {
     // Remove only bands that contain no circle, price, callout body, or tail.
     // Every occupied band moves as a unit, so shapes and their gaps stay intact.
     const bands = layout.items.map(item => {
