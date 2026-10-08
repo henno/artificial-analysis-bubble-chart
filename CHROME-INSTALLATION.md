@@ -45,7 +45,7 @@ If the chart is missing, reload the page. Check that Tampermonkey is enabled and
 
 ## Use the chart
 
-- Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper. Select a bubble to see its exact values.
+- Higher bubbles are smarter, bubbles farther left are faster, and smaller bubbles are cheaper. Select a bubble to see its details.
 - Use the sliders or number fields to set a minimum Intelligence Index and maximum time and cost.
 - Use **AA model selection** to pick models. Turn on **Regex** beside the search field to match names or providers with a pattern such as `(Claude)|(GPT)`. Search and chart filters also update AA's other charts.
 - Click a `?` button to learn about the Pareto line, outlines, or hidden models.

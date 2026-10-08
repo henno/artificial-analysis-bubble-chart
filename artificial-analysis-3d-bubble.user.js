@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.3.5
+// @version      2.4.0
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -53,6 +53,7 @@
   let svg = null;
   let tooltip = null;
   let status = null;
+  const labelPositions = new Map();
 
   const log = (...args) => console.info(PREFIX, ...args);
   const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -401,7 +402,7 @@
       const helpText = {
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
-        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. Prices appear inside bubbles when they fit, or above and to the left when they do not. Each label uses only enough decimal places to distinguish its price from other visible prices, with at least cents and no trailing zeros. Free models show $0. Select a bubble for model details. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
+        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. A price appears inside its bubble when it fits, or in the model label when it does not. The model variant is shown below the name. Labels use nearby free space, with a short line to the bubble. Each price uses only enough decimal places to distinguish it from other visible prices, with at least cents and no trailing zeros. Free models show $0. Select a bubble for model details. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
         dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. The Tolerance slider can also hide near matches. Open “Why models are hidden” below the filters for exact comparisons.',
         tolerance: 'Tolerance controls how close another model must be to hide this one. At 0%, the other model must be at least as smart, as fast, and as cheap, with a strict improvement in one measure. Above 0%, it may be worse by up to the selected percentage in each measure, but its largest percentage improvement must exceed its largest percentage disadvantage. Each percentage is measured against the model being hidden. For example, at 4%, a model that is 20% faster and 4% more expensive can hide another model if it is at least as smart. Use a higher value to remove near matches when a large benefit matters more to you than a small trade-off. A higher value can only hide more models. The purple 3D Pareto outlines always use exact values.',
       };
@@ -512,70 +513,183 @@
     }
   }
 
-  function renderLabels(models, xScale, yScale, labelsLayer, leadersLayer, width, occupied) {
+  function compactLabelRows(name, price, measure) {
+    const variant = name.match(/^(.+?)\s+\((.+)\)$/);
+    const rows = [];
+    const wrap = (value, secondary) => {
+      measure.font = `${secondary ? 10 : 11}px system-ui`;
+      let line = '';
+      for (const word of value.split(/\s+/)) {
+        const next = line ? `${line} ${word}` : word;
+        if (line && measure.measureText(next).width > 175) { rows.push({ value: line, secondary }); line = word; }
+        else line = next;
+      }
+      if (line) rows.push({ value: line, secondary });
+    };
+    wrap(variant ? variant[1] : name, false);
+    if (variant) wrap(variant[2], true);
+    if (price) {
+      const last = rows[rows.length - 1];
+      measure.font = '10px system-ui';
+      const textWidth = measure.measureText(`${last.value} · `).width;
+      measure.font = '600 10px system-ui';
+      if (last.secondary && textWidth + measure.measureText(price).width <= 175) last.price = price;
+      else rows.push({ value: '', secondary: true, price });
+    }
+    return rows;
+  }
+
+  function boxesOverlap(a, b, gap = 4) {
+    return a.left < b.right + gap && a.right > b.left - gap && a.top < b.bottom + gap && a.bottom > b.top - gap;
+  }
+
+  function lineHitsBox(line, box, gap = 2) {
+    let start = 0, end = 1;
+    for (const [origin, change, low, high] of [[line.x1, line.x2 - line.x1, box.left - gap, box.right + gap], [line.y1, line.y2 - line.y1, box.top - gap, box.bottom + gap]]) {
+      if (Math.abs(change) < .001) { if (origin < low || origin > high) return false; continue; }
+      const a = (low - origin) / change, b = (high - origin) / change;
+      start = Math.max(start, Math.min(a, b));
+      end = Math.min(end, Math.max(a, b));
+      if (start > end) return false;
+    }
+    return true;
+  }
+
+  function linesCross(a, b) {
+    const side = (x, y, line) => (line.x2 - line.x1) * (y - line.y1) - (line.y2 - line.y1) * (x - line.x1);
+    return side(a.x1, a.y1, b) * side(a.x2, a.y2, b) < 0 && side(b.x1, b.y1, a) * side(b.x2, b.y2, a) < 0;
+  }
+
+  function renderLabels(models, labelsLayer, leadersLayer, bounds, occupied, measure) {
     const items = models.map(model => {
-      const cx = xScale(model.time), cy = yScale(model.intelligence);
-      const text = svgEl('text', { x: cx + 10, y: cy - 10, 'data-aa3d-id': model.id, 'text-anchor': 'start', 'font-size': 11, fill: '#262626', stroke: '#fff', 'stroke-width': 3, 'stroke-linejoin': 'round', 'paint-order': 'stroke', 'pointer-events': 'none' });
-      text.textContent = model.name;
+      const text = svgEl('text', { x: 0, y: 0, 'data-aa3d-id': model.id, 'data-aa3d-name': model.name, 'font-size': 11, fill: '#262626', stroke: '#fff', 'stroke-width': 3, 'stroke-linejoin': 'round', 'paint-order': 'stroke', 'pointer-events': 'none', 'aria-hidden': 'true' });
+      const rows = compactLabelRows(model.name, model.externalPrice, measure).map((row, index) => {
+        const line = svgEl('tspan', { x: 0, y: index * 14, 'font-size': row.secondary ? 10 : 11, fill: row.secondary ? '#555' : '#262626' });
+        line.textContent = row.value;
+        if (row.price) {
+          if (row.value) line.append(document.createTextNode(' · '));
+          const price = svgEl('tspan', { 'font-weight': 600, fill: '#171717', 'data-aa3d-price-id': model.id });
+          price.textContent = row.price;
+          line.append(price);
+        }
+        text.append(line);
+        return line;
+      });
       labelsLayer.append(text);
       const box = text.getBBox();
-      return { text, cx, cy, width: box.width, height: box.height, topOffset: box.y - (cy - 10) };
-    }).sort((a, b) => b.cx - a.cx || a.cy - b.cy);
-    const placed = [...occupied];
+      return { ...model, text, rows, width: box.width, height: box.height, offsetX: box.x, offsetY: box.y, candidates: [] };
+    });
+    const endpoint = (item, box) => ({ x1: item.cx, y1: item.cy, x2: Math.max(box.left, Math.min(item.cx, box.right)), y2: Math.max(box.top, Math.min(item.cy, box.bottom)) });
     for (const item of items) {
-      let position = null;
-      let bestScore = Infinity;
-      for (let y = item.cy - 10; y + item.topOffset >= 4; y -= 15) {
-        const rise = item.cy - 10 - y;
-        if (rise * 1.2 >= bestScore) break;
-        const top = y + item.topOffset;
-        let x = item.cx + 10;
-        while (x + item.width <= width - 8) {
-          const conflict = placed.find(box => x < box.right + 5 && x + item.width > box.left - 5 && top < box.bottom + 5 && top + item.height > box.top - 5);
-          if (!conflict) {
-            const score = x - item.cx - 10 + rise * 1.2;
-            if (score < bestScore) { bestScore = score; position = { x, y, left: x, right: x + item.width, top, bottom: top + item.height }; }
-            break;
-          }
-          x = conflict.right + 5;
+      const previous = labelPositions.get(item.id);
+      const seen = new Set();
+      const add = (left, top, preference) => {
+        const key = `${Math.round(left)},${Math.round(top)}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const box = { left, top, right: left + item.width, bottom: top + item.height };
+        if (left < bounds.left || top < bounds.top || box.right > bounds.right || box.bottom > bounds.bottom) return;
+        const line = endpoint(item, box);
+        if (occupied.some(other => boxesOverlap(box, other) || (!other.id && lineHitsBox(line, other)))) return;
+        if (items.some(other => {
+          const dx = other.cx - Math.max(box.left, Math.min(other.cx, box.right));
+          const dy = other.cy - Math.max(box.top, Math.min(other.cy, box.bottom));
+          return dx * dx + dy * dy < (other.r + 4) ** 2;
+        })) return;
+        const length = Math.hypot(line.x2 - item.cx, line.y2 - item.cy);
+        const outside = Math.max(0, length - item.r);
+        const movement = previous ? Math.hypot(left - item.cx - previous.dx, top - item.cy - previous.dy) * .12 : 0;
+        item.candidates.push({ ...box, line, outside, score: outside + preference + movement });
+      };
+      if (previous) add(item.cx + previous.dx, item.cy + previous.dy, 0);
+      const angles = [-45, 0, -90, 45, -135, 180, 90, 135, -22.5, -67.5, 22.5, 67.5, -112.5, -157.5, 112.5, 157.5];
+      for (const extra of [0, 10, 22, 38, 58, 84, 116, 156, 208, 272, 352, 460, 600, 780]) {
+        for (let index = 0; index < angles.length; index++) {
+          const angle = angles[index] * Math.PI / 180, dx = Math.cos(angle), dy = Math.sin(angle), distance = item.r + 8 + extra;
+          const left = item.cx + dx * distance - (dx < -.001 ? item.width : dx > .001 ? 0 : item.width / 2);
+          const top = item.cy + dy * distance - (dy < -.001 ? item.height : dy > .001 ? 0 : item.height / 2);
+          add(left, top, Math.min(index, 7));
         }
       }
-      if (!position) return false;
-      item.text.setAttribute('x', position.x);
-      item.text.setAttribute('y', position.y);
-      const firstLetter = item.text.getExtentOfChar(0);
-      leadersLayer.append(svgEl('line', { x1: item.cx, y1: item.cy, x2: firstLetter.x, y2: firstLetter.y + firstLetter.height, stroke: '#666', 'stroke-width': .8, 'stroke-opacity': .7, 'pointer-events': 'none', 'data-aa3d-leader': item.text.getAttribute('data-aa3d-id') }));
-      placed.push(position);
+      item.candidates.sort((a, b) => a.score - b.score);
+      item.crowd = items.filter(other => other !== item && Math.hypot(other.cx - item.cx, other.cy - item.cy) < 150).length;
     }
-    return true;
-  }
-
-  function renderExternalPrices(items, pricesLayer, leadersLayer, occupied) {
-    for (const item of items.sort((a, b) => a.cx - b.cx || a.cy - b.cy)) {
-      const text = svgEl('text', { x: item.cx - 10, y: item.cy - 10, 'text-anchor': 'end', 'font-size': 11, 'font-weight': 600, fill: '#262626', stroke: '#fff', 'stroke-width': 3, 'stroke-linejoin': 'round', 'paint-order': 'stroke', 'pointer-events': 'none', 'aria-hidden': 'true', 'data-aa3d-price-id': item.id });
-      text.textContent = item.price;
-      pricesLayer.append(text);
-      const box = text.getBBox();
-      const topOffset = box.y - (item.cy - 10);
-      let position = null;
-      const right = item.cx - 10;
-      const left = right - box.width;
-      for (let y = item.cy - 10; y + topOffset >= 4 && !position; y -= 15) {
-        const top = y + topOffset;
-        const conflict = occupied.some(other => left < other.right + 5 && right > other.left - 5 && top < other.bottom + 5 && top + box.height > other.top - 5);
-        if (!conflict && left >= 4) position = { x: right, y, left, right, top, bottom: top + box.height };
+    const choose = (item, placed) => {
+      let best = null, bestScore = Infinity;
+      for (const candidate of item.candidates) {
+        if (candidate.score >= bestScore) break;
+        let crossings = 0, blocked = false;
+        for (const other of placed.values()) {
+          if (boxesOverlap(candidate, other)) { blocked = true; break; }
+          if (lineHitsBox(candidate.line, other) || lineHitsBox(other.line, candidate)) crossings += 3;
+          if (linesCross(candidate.line, other.line)) crossings++;
+        }
+        if (!blocked && candidate.score + crossings * 12 < bestScore) { best = candidate; bestScore = candidate.score + crossings * 12; }
       }
-      if (!position) return false;
-      text.setAttribute('x', position.x);
-      text.setAttribute('y', position.y);
-      const lastLetter = text.getExtentOfChar(item.price.length - 1);
-      leadersLayer.append(svgEl('line', { x1: item.cx, y1: item.cy, x2: lastLetter.x + lastLetter.width, y2: lastLetter.y + lastLetter.height, stroke: '#666', 'stroke-width': .8, 'stroke-opacity': .7, 'pointer-events': 'none', 'data-aa3d-price-leader': item.id }));
-      occupied.push(position);
+      return best;
+    };
+    const solve = order => {
+      const placed = new Map(), failed = [];
+      for (const item of order) {
+        const position = choose(item, placed);
+        if (position) placed.set(item.id, position); else failed.push(item);
+      }
+      const lengths = [...placed.values()].map(position => position.outside);
+      return { placed, failed, quality: Math.max(0, ...lengths) * 2 + lengths.reduce((sum, length) => sum + length, 0) / Math.max(1, items.length) };
+    };
+    const order = [...items].sort((a, b) => a.candidates.length - b.candidates.length || b.crowd - a.crowd || b.width - a.width || a.id.localeCompare(b.id));
+    let best = solve(order), attempt = best;
+    // Give labels with long lines an earlier choice of nearby space.
+    for (let pass = 0; pass < 2 && (attempt.failed.length || attempt.quality > 135); pass++) {
+      const next = [...items].sort((a, b) => (attempt.placed.get(b.id)?.outside ?? 10000) - (attempt.placed.get(a.id)?.outside ?? 10000) || order.indexOf(a) - order.indexOf(b));
+      attempt = solve(next);
+      if (attempt.failed.length < best.failed.length || (attempt.failed.length === best.failed.length && attempt.quality < best.quality)) best = attempt;
+    }
+    if (best.failed.length) return false;
+    for (const item of [...items].sort((a, b) => best.placed.get(b.id).outside - best.placed.get(a.id).outside)) {
+      const original = best.placed.get(item.id);
+      best.placed.delete(item.id);
+      best.placed.set(item.id, choose(item, best.placed) || original);
+    }
+    const quality = placed => {
+      const lengths = [...placed.values()].map(position => position.outside);
+      return Math.max(...lengths) * 2 + lengths.reduce((sum, length) => sum + length, 0) / items.length;
+    };
+    // Move nearby labels together when one label has a much longer line.
+    for (const item of [...items].sort((a, b) => best.placed.get(b.id).outside - best.placed.get(a.id).outside).slice(0, 8)) {
+      const original = best.placed.get(item.id);
+      if (original.outside < 38) continue;
+      let improved = best.placed, bestQuality = quality(improved);
+      for (const candidate of item.candidates.filter(position => position.outside < original.outside - 4).slice(0, 48)) {
+        const blocked = items.filter(other => other !== item && boxesOverlap(candidate, best.placed.get(other.id)));
+        if (blocked.length > 2) continue;
+        const trial = new Map(best.placed);
+        trial.delete(item.id);
+        blocked.forEach(other => trial.delete(other.id));
+        trial.set(item.id, candidate);
+        for (const other of blocked) {
+          const position = choose(other, trial);
+          if (position) trial.set(other.id, position);
+        }
+        if (trial.size !== items.length) continue;
+        const trialQuality = quality(trial);
+        if (trialQuality < bestQuality - 1) { improved = trial; bestQuality = trialQuality; }
+      }
+      best.placed = improved;
+    }
+    for (const item of items) {
+      const position = best.placed.get(item.id);
+      const x = position.left - item.offsetX, y = position.top - item.offsetY;
+      item.text.setAttribute('x', x);
+      item.text.setAttribute('y', y);
+      item.rows.forEach((row, index) => { row.setAttribute('x', x); row.setAttribute('y', y + index * 14); });
+      leadersLayer.append(svgEl('line', { ...position.line, stroke: '#666', 'stroke-width': .8, 'stroke-opacity': .6, 'pointer-events': 'none', 'data-aa3d-leader': item.id }));
+      labelPositions.set(item.id, { dx: position.left - item.cx, dy: position.top - item.cy });
     }
     return true;
   }
 
-  function renderChart(models, total, sourceInfo, topSpace = 100) {
+  function renderChart(models, total, sourceInfo, topSpace = 60) {
     svg.replaceChildren();
     tooltip.hidden = true;
     const width = Math.max(900, Math.round(chart.querySelector('.aa3d-plot').clientWidth));
@@ -588,18 +702,8 @@
     const minY = Math.min(...yValues) - 3, maxY = Math.max(...yValues) + 3;
     const maxCost = Math.max(...costs);
     const chartPrice = chartPriceFormatter(models);
-    const plot = { left: 105, top: 25 + topSpace, right: width - 22, bottom: height - 52 };
+    const plot = { left: 68, top: 25 + topSpace, right: width - 52, bottom: height - 52 };
     const measure = document.createElement('canvas').getContext('2d');
-    measure.font = '600 11px system-ui';
-    plot.left = Math.max(plot.left, Math.ceil(Math.max(...models.map(model => measure.measureText(chartPrice(model.cost)).width))) + 15);
-    measure.font = '11px system-ui';
-    for (const model of models) {
-      const fraction = (model.time - minX) / (maxX - minX);
-      if (fraction <= 0) continue;
-      const available = width - 22 - measure.measureText(model.name).width;
-      plot.right = Math.min(plot.right, plot.left + (available - plot.left) / fraction);
-    }
-    plot.right = Math.max(plot.left + 40, plot.right);
     const xScale = value => plot.left + (value - minX) / (maxX - minX) * (plot.right - plot.left);
     const yScale = value => plot.bottom - (value - minY) / (maxY - minY) * (plot.bottom - plot.top);
     // Circle diameter follows the cost ratio. Keep a small visible marker for low costs.
@@ -630,7 +734,7 @@
       const points = models.filter(m => m.pareto2).sort((a, b) => a.time - b.time || a.intelligence - b.intelligence);
       frontier.append(svgEl('polyline', { points: points.map(m => `${xScale(m.time)},${yScale(m.intelligence)}`).join(' '), fill: 'none', stroke: '#333', 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'pointer-events': 'none' }));
     }
-    const priceBoxes = [...axisBoxes], externalPrices = [];
+    const priceBoxes = [...axisBoxes], labelModels = [];
     [...models].sort((a, b) => b.cost - a.cost).forEach(model => {
       const cx = xScale(model.time), cy = yScale(model.intelligence), r = radius(model.cost);
       const circle = svgEl('circle', { cx, cy, r, fill: model.color, 'fill-opacity': .26, stroke: model.pareto3 ? '#7837aa' : model.color, 'stroke-opacity': model.pareto3 ? .9 : .45, 'stroke-width': model.pareto3 ? 2 : 1, 'data-aa3d-id': model.id, style: 'cursor:pointer' });
@@ -645,11 +749,13 @@
         text.textContent = price;
         prices.append(text);
         const box = text.getBBox();
-        priceBoxes.push({ left: box.x, right: box.x + box.width, top: box.y, bottom: box.y + box.height });
+        const priceBox = { id: model.id, left: box.x, right: box.x + box.width, top: box.y, bottom: box.y + box.height };
+        if (priceBoxes.some(other => boxesOverlap(priceBox, other, 2))) { text.remove(); continue; }
+        priceBoxes.push(priceBox);
         priceFits = true;
         break;
       }
-      if (!priceFits) externalPrices.push({ id: model.id, price, cx, cy });
+      labelModels.push({ id: model.id, name: model.name, cx, cy, r, externalPrice: priceFits ? '' : price });
       const hit = svgEl('circle', { cx, cy, r: Math.max(12, r), class: 'aa3d-hit', 'data-aa3d-hit-id': model.id, tabindex: '0', role: 'button', 'aria-label': `${model.name}: Intelligence Index ${model.intelligence.toFixed(2)}, time ${model.time.toFixed(2)} minutes, cost ${price}`, 'aria-describedby': 'aa3d-tooltip' });
       hit.addEventListener('pointerenter', () => { if (!state.pinned) showTooltip(model, hit, price); });
       hit.addEventListener('pointerleave', () => { if (!state.pinned && document.activeElement !== hit) tooltip.hidden = true; });
@@ -660,8 +766,7 @@
       hit.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } });
       hits.append(hit);
     });
-    if (!renderExternalPrices(externalPrices, prices, leaders, priceBoxes) && topSpace < 1000) return renderChart(models, total, sourceInfo, topSpace + 80);
-    if (!renderLabels(models, xScale, yScale, labels, leaders, width, priceBoxes) && topSpace < 1000) return renderChart(models, total, sourceInfo, topSpace + 80);
+    if (!renderLabels(labelModels, labels, leaders, { left: 28, top: 4, right: width - 8, bottom: plot.bottom - 5 }, priceBoxes, measure) && topSpace < 1000) return renderChart(models, total, sourceInfo, topSpace + 80);
     svg.onclick = event => { if (!event.target.closest('circle[data-aa3d-hit-id]')) { state.pinned = null; tooltip.hidden = true; } };
     status.textContent = `${models.length} of ${total} models shown · ${sourceInfo}`;
     chart.updatePan?.();
