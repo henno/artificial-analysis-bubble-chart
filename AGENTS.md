@@ -8,4 +8,5 @@
 - Kontrolli, et esimesel käivitamisel valib skript kõik AA mudelid enne domineerimisfiltrit. Kontrolli ka 4% tolerantsi, sisse lülitatud **Hide dominated models** valikut ja AA enda mudelivaliku muutumist.
 - Kontrolli, et sildid, 2D Pareto joon, 3D Pareto piirjoon ja kuluga võrdelised ringid on näha ilma eraldi linnukesteta.
 - Uuenda lehte ja käivita skript uuesti. Kontrolli, et salvestatud seaded ja AA mudelivalik püsivad. Vaata üle graafik, veateated ja ekraanipilt.
+- Pärast Tampermonkey skripti uuendamist värskenda ka need AA vahelehed, mis olid enne uuendust lahti. Kontrolli, et uus liides ilmub ja vana versiooni nupud puuduvad.
 - Taasta testi järel brauseri esialgne salvestatud olek ja aadress. Ära lisa siia paroole, võtmeid ega brauseri salvestatud andmeid.
