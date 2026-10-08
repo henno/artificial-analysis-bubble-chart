@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.5
+// @version      2.5.6
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -694,9 +694,12 @@
         const line = svgEl('tspan', { x: p.left + 8, y: p.top + 16 + index * 14, 'font-size': row.secondary ? 10 : 11, fill: row.secondary ? '#555' : '#262626' });
         for (const part of modelNameParts(row.value, item.name, row.secondary)) {
           if (!part.value) continue;
-          const span = svgEl('tspan', { 'font-weight': part.bold ? 700 : 400 });
-          span.textContent = part.value;
-          line.append(span);
+          for (const token of part.value.split(/(\bmax\b)/i)) {
+            if (!token) continue;
+            const span = svgEl('tspan', { 'font-weight': part.bold ? 700 : 400, ...(row.secondary && /^max$/i.test(token) ? { fill: '#c62828' } : {}) });
+            span.textContent = token;
+            line.append(span);
+          }
         }
         if (row.price && row.value) line.append(document.createTextNode(' · '));
         if (row.price) { const price = svgEl('tspan', { 'data-aa3d-price-id': item.id, 'font-weight': 600, fill: '#171717' }); price.textContent = row.price; line.append(price); }
