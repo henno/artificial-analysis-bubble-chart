@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.19
+// @version      2.5.20
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -687,7 +687,7 @@
       if (!failed) break;
       height = Math.ceil(height * 1.4);
     }
-    if (state.compactVertical) compactVerticalLayout(result);
+    if (state.compactVertical) { compactVerticalLayout(result); spaceIntelligenceTicks(result); }
     return result;
   }
 
@@ -774,6 +774,38 @@
     layout.plot.top = mapY(layout.plot.top);
     layout.plot.bottom = mapY(layout.plot.bottom);
     layout.height -= cuts.reduce((sum, cut) => sum + cut.remove, 0);
+  }
+
+  function spaceIntelligenceTicks(layout) {
+    // Expand crowded axis intervals. Never reduce an existing model gap.
+    const scale = layout.yScale;
+    const anchors = [...layout.items.map(item => ({ y: item.cy })),
+      ...integerTicks(layout.minY, layout.maxY, Math.ceil(layout.maxY - layout.minY) + 1)
+        .map(value => ({ y: scale(value), tick: true }))].sort((a, b) => a.y - b.y);
+    let previous, lastTick = -Infinity;
+    for (const anchor of anchors) {
+      anchor.target = previous ? previous.target + anchor.y - previous.y : anchor.y;
+      if (anchor.tick) { anchor.target = Math.max(anchor.target, lastTick + 20); lastTick = anchor.target; }
+      previous = anchor;
+    }
+    const mapY = y => {
+      if (y <= anchors[0].y) return y + anchors[0].target - anchors[0].y;
+      for (let i = 1; i < anchors.length; i++) {
+        const a = anchors[i - 1], b = anchors[i];
+        if (y <= b.y) return b.y === a.y ? b.target : a.target + (y - a.y) / (b.y - a.y) * (b.target - a.target);
+      }
+      const last = anchors[anchors.length - 1];
+      return y + last.target - last.y;
+    };
+    layout.yScale = value => mapY(scale(value));
+    for (const item of layout.items) {
+      const shift = mapY(item.cy) - item.cy;
+      item.cy += shift;
+      if (item.position) for (const key of ['top', 'bottom', 'cornerY']) item.position[key] += shift;
+    }
+    layout.plot.top = mapY(layout.plot.top);
+    layout.plot.bottom = mapY(layout.plot.bottom);
+    layout.height = mapY(layout.height);
   }
 
   function resizePlot(height) {
