@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.3.4
+// @version      2.3.5
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -56,6 +56,35 @@
 
   const log = (...args) => console.info(PREFIX, ...args);
   const finite = value => typeof value === 'number' && Number.isFinite(value);
+  function detailPrice(cost) {
+    if (cost === 0) return '$0';
+    for (let digits = 3; digits <= 20; digits++) {
+      const rounded = cost.toFixed(digits);
+      if (Number(rounded) !== 0) return `$${rounded.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')}`;
+    }
+    return `$${cost}`;
+  }
+  function chartPriceFormatter(models) {
+    const costs = [...new Set(models.map(model => model.cost))].sort((a, b) => a - b);
+    const formatters = new Map();
+    const labels = new Map();
+    for (let index = 0; index < costs.length; index++) {
+      const cost = costs[index];
+      if (cost === 0) { labels.set(cost, '$0'); continue; }
+      for (let digits = 2; digits <= 20; digits++) {
+        if (!formatters.has(digits)) formatters.set(digits, new Intl.NumberFormat('en-US', { useGrouping: false, minimumFractionDigits: digits, maximumFractionDigits: digits }));
+        const formatter = formatters.get(digits);
+        const rounded = formatter.format(cost);
+        if (Number(rounded) === 0) continue;
+        if (index > 0 && formatter.format(costs[index - 1]) === rounded) continue;
+        if (index + 1 < costs.length && formatter.format(costs[index + 1]) === rounded) continue;
+        labels.set(cost, `$${rounded.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')}`);
+        break;
+      }
+      if (!labels.has(cost)) labels.set(cost, detailPrice(cost));
+    }
+    return cost => labels.get(cost);
+  }
   const svgEl = (name, attrs = {}) => {
     const el = document.createElementNS(NS, name);
     for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, String(value));
@@ -286,7 +315,7 @@
       chart.id = ID;
       chart.lang = 'en';
       chart.innerHTML = `
-        <div class="aa3d-head"><div><h3>Intelligence Index vs. Time per Task</h3><p>Higher = smarter · Left = faster · Smaller bubble = cheaper. Select a bubble for exact values.</p></div><div class="aa3d-picker-wrap"><span>AA model selection</span><button type="button" class="aa3d-model-picker" aria-label="Select AA models" aria-haspopup="dialog" aria-expanded="false" disabled><span>Select models</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg></button></div></div>
+        <div class="aa3d-head"><div><h3>Intelligence Index vs. Time per Task</h3><p>Higher = smarter · Left = faster · Smaller bubble = cheaper. Select a bubble for model details.</p></div><div class="aa3d-picker-wrap"><span>AA model selection</span><button type="button" class="aa3d-model-picker" aria-label="Select AA models" aria-haspopup="dialog" aria-expanded="false" disabled><span>Select models</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg></button></div></div>
         <div class="aa3d-legend"><span><i class="aa3d-example-dot"></i> Provider colour</span><span>Bubble diameter shows cost as a share of the highest visible cost. <button type="button" class="aa3d-help-button" data-help="bubbleSize" aria-label="Explain bubble size" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Dashed line: 2D Pareto <button type="button" class="aa3d-help-button" data-help="pareto2" aria-label="Explain 2D Pareto line" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Purple outline: 3D Pareto <button type="button" class="aa3d-help-button" data-help="pareto3" aria-label="Explain 3D Pareto outline" aria-controls="aa3d-help" aria-expanded="false">?</button></span><details><summary>Provider colours</summary><div class="aa3d-provider-list"></div></details></div>
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
@@ -372,7 +401,7 @@
       const helpText = {
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
-        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. Rounded prices appear inside bubbles when they fit, or above and to the left when they do not. Select a bubble for the exact cost. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
+        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. Prices appear inside bubbles when they fit, or above and to the left when they do not. Each label uses only enough decimal places to distinguish its price from other visible prices, with at least cents and no trailing zeros. Free models show $0. Select a bubble for model details. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
         dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. The Tolerance slider can also hide near matches. Open “Why models are hidden” below the filters for exact comparisons.',
         tolerance: 'Tolerance controls how close another model must be to hide this one. At 0%, the other model must be at least as smart, as fast, and as cheap, with a strict improvement in one measure. Above 0%, it may be worse by up to the selected percentage in each measure, but its largest percentage improvement must exceed its largest percentage disadvantage. Each percentage is measured against the model being hidden. For example, at 4%, a model that is 20% faster and 4% more expensive can hide another model if it is at least as smart. Use a higher value to remove near matches when a large benefit matters more to you than a small trade-off. A higher value can only hide more models. The purple 3D Pareto outlines always use exact values.',
       };
@@ -558,8 +587,11 @@
     const maxX = Math.max(...xValues) + Math.max(1, (Math.max(...xValues) - minX) * .05);
     const minY = Math.min(...yValues) - 3, maxY = Math.max(...yValues) + 3;
     const maxCost = Math.max(...costs);
+    const chartPrice = chartPriceFormatter(models);
     const plot = { left: 105, top: 25 + topSpace, right: width - 22, bottom: height - 52 };
     const measure = document.createElement('canvas').getContext('2d');
+    measure.font = '600 11px system-ui';
+    plot.left = Math.max(plot.left, Math.ceil(Math.max(...models.map(model => measure.measureText(chartPrice(model.cost)).width))) + 15);
     measure.font = '11px system-ui';
     for (const model of models) {
       const fraction = (model.time - minX) / (maxX - minX);
@@ -604,7 +636,7 @@
       const circle = svgEl('circle', { cx, cy, r, fill: model.color, 'fill-opacity': .26, stroke: model.pareto3 ? '#7837aa' : model.color, 'stroke-opacity': model.pareto3 ? .9 : .45, 'stroke-width': model.pareto3 ? 2 : 1, 'data-aa3d-id': model.id, style: 'cursor:pointer' });
       circle.setAttribute('pointer-events', 'none');
       bubbles.append(circle);
-      const price = `$${model.cost.toFixed(model.cost < .1 ? 3 : 2)}`;
+      const price = chartPrice(model.cost);
       let priceFits = false;
       for (const fontSize of [11, 10, 9, 8]) {
         measure.font = `600 ${fontSize}px system-ui`;
@@ -618,12 +650,12 @@
         break;
       }
       if (!priceFits) externalPrices.push({ id: model.id, price, cx, cy });
-      const hit = svgEl('circle', { cx, cy, r: Math.max(12, r), class: 'aa3d-hit', 'data-aa3d-hit-id': model.id, tabindex: '0', role: 'button', 'aria-label': `${model.name}: Intelligence Index ${model.intelligence.toFixed(2)}, time ${model.time.toFixed(2)} minutes, cost $${model.cost.toFixed(3)}`, 'aria-describedby': 'aa3d-tooltip' });
-      hit.addEventListener('pointerenter', () => { if (!state.pinned) showTooltip(model, hit); });
+      const hit = svgEl('circle', { cx, cy, r: Math.max(12, r), class: 'aa3d-hit', 'data-aa3d-hit-id': model.id, tabindex: '0', role: 'button', 'aria-label': `${model.name}: Intelligence Index ${model.intelligence.toFixed(2)}, time ${model.time.toFixed(2)} minutes, cost ${price}`, 'aria-describedby': 'aa3d-tooltip' });
+      hit.addEventListener('pointerenter', () => { if (!state.pinned) showTooltip(model, hit, price); });
       hit.addEventListener('pointerleave', () => { if (!state.pinned && document.activeElement !== hit) tooltip.hidden = true; });
-      hit.addEventListener('focus', () => { if (!state.pinned) showTooltip(model, hit); });
+      hit.addEventListener('focus', () => { if (!state.pinned) showTooltip(model, hit, price); });
       hit.addEventListener('blur', () => { if (!state.pinned) tooltip.hidden = true; });
-      const toggle = () => { state.pinned = state.pinned === model.id ? null : model.id; if (state.pinned) showTooltip(model, hit); else tooltip.hidden = true; };
+      const toggle = () => { state.pinned = state.pinned === model.id ? null : model.id; if (state.pinned) showTooltip(model, hit, price); else tooltip.hidden = true; };
       hit.addEventListener('click', event => { event.stopPropagation(); toggle(); });
       hit.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } });
       hits.append(hit);
@@ -635,8 +667,8 @@
     chart.updatePan?.();
   }
 
-  function showTooltip(model, circle) {
-    tooltip.textContent = `${model.name}\n${model.provider}\nIntelligence Index: ${model.intelligence.toFixed(2)}\nTime per Task: ${model.time.toFixed(2)} min\nCost per Task: $${model.cost.toFixed(3)}\n2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
+  function showTooltip(model, circle, price) {
+    tooltip.textContent = `${model.name}\n${model.provider}\nIntelligence Index: ${model.intelligence.toFixed(2)}\nTime per Task: ${model.time.toFixed(2)} min\nCost per Task: ${price}\n2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
     tooltip.hidden = false;
     const plotElement = chart.querySelector('.aa3d-plot');
     const chartBox = plotElement.getBoundingClientRect();
@@ -660,7 +692,7 @@
     hiddenBox.querySelector('summary').textContent = `Why ${hidden.length} ${hidden.length === 1 ? 'model is' : 'models are'} hidden`;
     hiddenBox.querySelector('ul').replaceChildren(...hidden.map(({ model, by }) => {
       const item = document.createElement('li');
-      item.textContent = `${model.name} → ${by.name}: Intelligence ${model.intelligence.toFixed(1)} vs ${by.intelligence.toFixed(1)}, time ${model.time.toFixed(2)} vs ${by.time.toFixed(2)} min, cost $${model.cost.toFixed(3)} vs $${by.cost.toFixed(3)}.`;
+      item.textContent = `${model.name} → ${by.name}: Intelligence ${model.intelligence.toFixed(1)} vs ${by.intelligence.toFixed(1)}, time ${model.time.toFixed(2)} vs ${by.time.toFixed(2)} min, cost ${detailPrice(model.cost)} vs ${detailPrice(by.cost)}.`;
       return item;
     }));
     const providers = new Map(allModels.map(model => [model.provider, model.color]));
