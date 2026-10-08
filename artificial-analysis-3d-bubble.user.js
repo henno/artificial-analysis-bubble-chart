@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.15
+// @version      2.5.16
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -20,7 +20,7 @@
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 4;
   const NS = 'http://www.w3.org/2000/svg';
-  const state = { hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
+  const state = { compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
   const filterMetrics = [
     { metric: 'intelligence', key: 'intelligenceMin', direction: 'min', step: 0.1, digits: 1 },
     { metric: 'time', key: 'timeMax', step: 0.1, digits: 1 },
@@ -30,6 +30,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (!saved || typeof saved !== 'object') return;
+      if (typeof saved.compactVertical === 'boolean') state.compactVertical = saved.compactVertical;
       if (typeof saved.hideDominated === 'boolean') state.hideDominated = saved.hideDominated;
       // Existing users keep their AA model selection. New users select all models once.
       state.modelSelectionInitialized = typeof saved.modelSelectionInitialized === 'boolean' ? saved.modelSelectionInitialized : true;
@@ -45,7 +46,7 @@
   function saveSettings() {
     const filters = Object.fromEntries(filterMetrics.filter(({ key }) => Number.isFinite(state.filters[key])).map(({ key }) => [key, state.filters[key]]));
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
     } catch (_) { /* Keep the current page usable if storage is unavailable. */ }
   }
   restoreSettings();
@@ -323,6 +324,7 @@
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label><button type="button" class="aa3d-help-button" data-help="tolerance" aria-label="Explain tolerance" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
+          <label title="Remove empty vertical bands. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
@@ -618,7 +620,7 @@
     });
     let height = Math.max(560, Math.ceil(models.length / 35) * 240, models.length > 70 ? models.length * 26 : 0);
     const previousLayout = lastLayout?.value;
-    if (previousLayout?.width === width && models.length > previousLayout.items.length * .8 && models.length < previousLayout.items.length * 1.2) {
+    if (!state.compactVertical && previousLayout?.width === width && models.length > previousLayout.items.length * .8 && models.length < previousLayout.items.length * 1.2) {
       height = Math.max(height, Math.ceil(previousLayout.height * models.length / previousLayout.items.length));
     }
     const directions = [[1, -1, 'NE'], [1, 1, 'SE']];
@@ -686,7 +688,41 @@
       if (!failed) break;
       height = Math.ceil(height * 1.4);
     }
+    if (state.compactVertical) compactVerticalLayout(result);
     return result;
+  }
+
+  function compactVerticalLayout(layout) {
+    // Remove only bands that contain no circle, price, callout body, or tail.
+    // Every occupied band moves as a unit, so shapes and their gaps stay intact.
+    const bands = layout.items.map(item => {
+      const p = item.position;
+      return { top: Math.min(item.cy - Math.max(item.r, 9), p?.top ?? item.cy),
+        bottom: Math.max(item.cy + Math.max(item.r, 9), p?.bottom ?? item.cy) };
+    }).sort((a, b) => a.top - b.top);
+    const merged = [];
+    for (const band of bands) {
+      const last = merged[merged.length - 1];
+      if (last && band.top <= last.bottom) last.bottom = Math.max(last.bottom, band.bottom);
+      else merged.push({ ...band });
+    }
+    const cuts = [];
+    for (let i = 1; i < merged.length; i++) {
+      const start = merged[i - 1].bottom, end = merged[i].top;
+      if (end - start > 48) cuts.push({ start, end, remove: end - start - 48 });
+    }
+    const mapY = y => y - cuts.reduce((sum, cut) => sum +
+      (y <= cut.start ? 0 : y >= cut.end ? cut.remove : (y - cut.start) * cut.remove / (cut.end - cut.start)), 0);
+    const oldTop = layout.plot.top, oldBottom = layout.plot.bottom;
+    layout.yScale = value => mapY(oldBottom - (value - layout.minY) / (layout.maxY - layout.minY) * (oldBottom - oldTop));
+    for (const item of layout.items) {
+      const shift = mapY(item.cy) - item.cy;
+      item.cy += shift;
+      if (item.position) for (const key of ['top', 'bottom', 'cornerY']) item.position[key] += shift;
+    }
+    layout.plot.top = mapY(layout.plot.top);
+    layout.plot.bottom = mapY(layout.plot.bottom);
+    layout.height -= cuts.reduce((sum, cut) => sum + cut.remove, 0);
   }
 
   function resizePlot(height) {
@@ -759,7 +795,7 @@
     const chartPrice = chartPriceFormatter(models);
     const measure = document.createElement('canvas').getContext('2d');
     const radius = cost => maxCost === 0 ? 43 : Math.max(3, 43 * cost / maxCost);
-    const layoutKey = JSON.stringify([width, models.map(m => [m.id, m.name, m.time, m.intelligence, m.cost])]);
+    const layoutKey = JSON.stringify([width, state.compactVertical, models.map(m => [m.id, m.name, m.time, m.intelligence, m.cost])]);
     if (lastLayout?.key !== layoutKey) lastLayout = { key: layoutKey, value: arrangeCallouts(models, width, measure, chartPrice, radius) };
     const layout = lastLayout.value;
     const { height, plot, xScale, yScale, minX, maxX, minY, maxY } = layout;
@@ -797,7 +833,7 @@
     grid.append(svgEl('line', { x1: plot.left, y1: plot.bottom, x2: plot.right, y2: plot.bottom, stroke: '#999' }));
     grid.append(svgEl('line', { x1: plot.left, y1: plot.top, x2: plot.left, y2: plot.bottom, stroke: '#999' }));
     const xlabel = svgEl('text', { x: (plot.left + plot.right) / 2, y: height - 8, 'text-anchor': 'middle', 'font-size': 12, fill: '#444' }); xlabel.textContent = 'Time per Task (minutes)'; grid.append(xlabel);
-    const ylabel = svgEl('text', { x: 14, y: (plot.top + plot.bottom) / 2, transform: `rotate(-90 14 ${(plot.top + plot.bottom) / 2})`, 'text-anchor': 'middle', 'font-size': 12, fill: '#444' }); ylabel.textContent = 'Intelligence Index'; grid.append(ylabel);
+    const ylabel = svgEl('text', { x: 14, y: (plot.top + plot.bottom) / 2, transform: `rotate(-90 14 ${(plot.top + plot.bottom) / 2})`, 'text-anchor': 'middle', 'font-size': 12, fill: '#444' }); ylabel.textContent = state.compactVertical ? 'Intelligence Index (nonlinear spacing)' : 'Intelligence Index'; grid.append(ylabel);
 
     if (pareto2.size > 1) {
       const points = models.filter(m => m.pareto2).sort((a, b) => a.time - b.time || a.intelligence - b.intelligence);
@@ -909,7 +945,7 @@
       models = models.filter(model => !hiddenIds.has(model.id));
     }
     syncNativeModelSelection(data, models);
-    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
+    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.compactVertical, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
     updateExplanations(all, missing, hidden);
