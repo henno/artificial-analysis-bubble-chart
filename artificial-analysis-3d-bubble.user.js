@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.0
+// @version      2.5.1
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -658,9 +658,20 @@
       labelPositions.set(item.id, p.direction);
       const group = svgEl('g', { 'data-aa3d-callout': item.id, 'data-direction': p.direction, 'pointer-events': 'none', 'aria-hidden': 'true' });
       const tipX = item.cx + p.ux * item.r, tipY = item.cy + p.uy * item.r;
-      group.append(svgEl('rect', { x: p.left + 1, y: p.top + 2, width: item.width, height: item.height, rx: 5, fill: '#000', opacity: .10 }));
-      tails.append(svgEl('path', { d: `M ${p.cornerX + p.dx * 9} ${p.cornerY} L ${tipX} ${tipY} L ${p.cornerX} ${p.cornerY + p.dy * 9} Z`, fill: '#fff', stroke: '#b8bcc3', 'stroke-width': .7, 'data-aa3d-tail': item.id }));
-      group.append(svgEl('rect', { x: p.left, y: p.top, width: item.width, height: item.height, rx: 5, fill: 'url(#aa3d-callout-fill)', stroke: '#cbd0d6', 'stroke-width': .7 }));
+      // Replace the nearest corner with the tail. One outline has no seam.
+      const l = p.left, t = p.top, r = l + item.width, b = t + item.height;
+      const tail = `L ${tipX} ${tipY}`;
+      const outline = `M ${l + (p.direction === 'SE' ? 9 : 5)} ${t}` +
+        ` H ${r - (p.direction === 'SW' ? 9 : 5)}` +
+        (p.direction === 'SW' ? ` ${tail} L ${r} ${t + 9}` : ` Q ${r} ${t} ${r} ${t + 5}`) +
+        ` V ${b - (p.direction === 'NW' ? 9 : 5)}` +
+        (p.direction === 'NW' ? ` ${tail} L ${r - 9} ${b}` : ` Q ${r} ${b} ${r - 5} ${b}`) +
+        ` H ${l + (p.direction === 'NE' ? 9 : 5)}` +
+        (p.direction === 'NE' ? ` ${tail} L ${l} ${b - 9}` : ` Q ${l} ${b} ${l} ${b - 5}`) +
+        ` V ${t + (p.direction === 'SE' ? 9 : 5)}` +
+        (p.direction === 'SE' ? ` ${tail} L ${l + 9} ${t}` : ` Q ${l} ${t} ${l + 5} ${t}`) + ' Z';
+      tails.append(svgEl('path', { d: outline, transform: 'translate(1 2)', fill: '#000', opacity: .10, 'pointer-events': 'none' }));
+      tails.append(svgEl('path', { d: outline, fill: 'url(#aa3d-callout-fill)', stroke: '#cbd0d6', 'stroke-width': .7, 'stroke-linejoin': 'round', 'data-aa3d-tail': item.id, 'pointer-events': 'none' }));
       const text = svgEl('text', { 'data-aa3d-id': item.id, 'data-aa3d-name': item.name, fill: '#262626', 'font-size': 11 });
       item.rows.forEach((row, index) => {
         const line = svgEl('tspan', { x: p.left + 8, y: p.top + 16 + index * 14, 'font-size': row.secondary ? 10 : 11, fill: row.secondary ? '#555' : '#262626' });
