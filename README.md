@@ -19,6 +19,7 @@ Artificial Analysis lists more than 600 models. Showing many models at once make
 - Set a minimum Intelligence Index and maximum time and cost with sliders or number fields. The chart updates as you move a slider.
 - Search by model or provider. Turn on **Regex** to use a pattern such as `(Claude)|(GPT)`; matching ignores case. The chart shows an error if the pattern is invalid. The search, sliders, and dominance filter also update AA's other charts.
 - The most expensive visible model has the largest bubble. Other bubble diameters follow their cost as a share of that model's cost. A model at half the cost has a bubble half as wide. Very small bubbles keep a visible marker.
+- Read the rounded price inside a bubble when it fits. Select any bubble to see its exact cost.
 - Open the AA model picker from the new chart.
 - See a dashed two-dimensional Pareto line and purple outlines for the exact three-dimensional Pareto set. Click the `?` buttons in the chart for explanations.
 - Open “Why models are hidden” to see which model and values caused each model to be hidden.

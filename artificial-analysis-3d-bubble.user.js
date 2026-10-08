@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.3.1
+// @version      2.3.2
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -372,7 +372,7 @@
       const helpText = {
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
-        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
+        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. Rounded prices appear inside bubbles when they fit. Select a bubble for the exact cost. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
         dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. Tolerance also allows a disadvantage up to the selected percentage if the largest improvement is greater than the largest disadvantage. Example: at 4%, a model 20% faster can qualify even if it is 4% more expensive. Raising tolerance never brings a hidden model back. Open “Why models are hidden” below the filters for exact comparisons.',
       };
       chart.querySelectorAll('[data-help]').forEach(button => button.addEventListener('click', () => {
@@ -482,7 +482,7 @@
     }
   }
 
-  function renderLabels(models, xScale, yScale, labelsLayer, leadersLayer, width) {
+  function renderLabels(models, xScale, yScale, labelsLayer, leadersLayer, width, occupied) {
     const items = models.map(model => {
       const cx = xScale(model.time), cy = yScale(model.intelligence);
       const text = svgEl('text', { x: cx + 10, y: cy - 10, 'data-aa3d-id': model.id, 'text-anchor': 'start', 'font-size': 11, fill: '#262626', stroke: '#fff', 'stroke-width': 3, 'stroke-linejoin': 'round', 'paint-order': 'stroke', 'pointer-events': 'none' });
@@ -491,7 +491,7 @@
       const box = text.getBBox();
       return { text, cx, cy, width: box.width, height: box.height, topOffset: box.y - (cy - 10) };
     }).sort((a, b) => b.cx - a.cx || a.cy - b.cy);
-    const placed = [];
+    const placed = [...occupied];
     for (const item of items) {
       let position = null;
       let bestScore = Infinity;
@@ -550,8 +550,8 @@
     const pareto3 = new Set(compute3DPareto(models).map(m => m.id));
     models.forEach(m => { m.pareto2 = pareto2.has(m.id); m.pareto3 = pareto3.has(m.id); });
 
-    const grid = svgEl('g'), frontier = svgEl('g'), bubbles = svgEl('g'), leaders = svgEl('g'), labels = svgEl('g'), hits = svgEl('g');
-    svg.append(grid, frontier, bubbles, leaders, labels, hits);
+    const grid = svgEl('g'), frontier = svgEl('g'), leaders = svgEl('g'), bubbles = svgEl('g'), prices = svgEl('g'), labels = svgEl('g'), hits = svgEl('g');
+    svg.append(grid, frontier, leaders, bubbles, prices, labels, hits);
     for (let i = 0; i <= 5; i++) {
       const xv = minX + (maxX - minX) * i / 5, yv = minY + (maxY - minY) * i / 5;
       const x = xScale(xv), y = yScale(yv);
@@ -569,11 +569,24 @@
       const points = models.filter(m => m.pareto2).sort((a, b) => a.time - b.time || a.intelligence - b.intelligence);
       frontier.append(svgEl('polyline', { points: points.map(m => `${xScale(m.time)},${yScale(m.intelligence)}`).join(' '), fill: 'none', stroke: '#333', 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'pointer-events': 'none' }));
     }
+    const priceBoxes = [];
     [...models].sort((a, b) => b.cost - a.cost).forEach(model => {
-      const circle = svgEl('circle', { cx: xScale(model.time), cy: yScale(model.intelligence), r: radius(model.cost), fill: model.color, 'fill-opacity': .26, stroke: model.pareto3 ? '#7837aa' : model.color, 'stroke-opacity': model.pareto3 ? .9 : .45, 'stroke-width': model.pareto3 ? 2 : 1, 'data-aa3d-id': model.id, style: 'cursor:pointer' });
+      const cx = xScale(model.time), cy = yScale(model.intelligence), r = radius(model.cost);
+      const circle = svgEl('circle', { cx, cy, r, fill: model.color, 'fill-opacity': .26, stroke: model.pareto3 ? '#7837aa' : model.color, 'stroke-opacity': model.pareto3 ? .9 : .45, 'stroke-width': model.pareto3 ? 2 : 1, 'data-aa3d-id': model.id, style: 'cursor:pointer' });
       circle.setAttribute('pointer-events', 'none');
       bubbles.append(circle);
-      const hit = svgEl('circle', { cx: xScale(model.time), cy: yScale(model.intelligence), r: Math.max(12, radius(model.cost)), class: 'aa3d-hit', 'data-aa3d-hit-id': model.id, tabindex: '0', role: 'button', 'aria-label': `${model.name}: Intelligence Index ${model.intelligence.toFixed(2)}, time ${model.time.toFixed(2)} minutes, cost $${model.cost.toFixed(3)}`, 'aria-describedby': 'aa3d-tooltip' });
+      const price = `$${model.cost.toFixed(model.cost < .1 ? 3 : 2)}`;
+      for (const fontSize of [11, 10, 9, 8]) {
+        measure.font = `600 ${fontSize}px system-ui`;
+        if (measure.measureText(price).width + 4 > 2 * r || fontSize + 4 > 2 * r) continue;
+        const text = svgEl('text', { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': fontSize, 'font-weight': 600, fill: '#171717', stroke: '#fff', 'stroke-width': 1.5, 'paint-order': 'stroke', 'pointer-events': 'none', 'aria-hidden': 'true', 'data-aa3d-price-id': model.id });
+        text.textContent = price;
+        prices.append(text);
+        const box = text.getBBox();
+        priceBoxes.push({ left: box.x, right: box.x + box.width, top: box.y, bottom: box.y + box.height });
+        break;
+      }
+      const hit = svgEl('circle', { cx, cy, r: Math.max(12, r), class: 'aa3d-hit', 'data-aa3d-hit-id': model.id, tabindex: '0', role: 'button', 'aria-label': `${model.name}: Intelligence Index ${model.intelligence.toFixed(2)}, time ${model.time.toFixed(2)} minutes, cost $${model.cost.toFixed(3)}`, 'aria-describedby': 'aa3d-tooltip' });
       hit.addEventListener('pointerenter', () => { if (!state.pinned) showTooltip(model, hit); });
       hit.addEventListener('pointerleave', () => { if (!state.pinned && document.activeElement !== hit) tooltip.hidden = true; });
       hit.addEventListener('focus', () => { if (!state.pinned) showTooltip(model, hit); });
@@ -583,7 +596,7 @@
       hit.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } });
       hits.append(hit);
     });
-    if (!renderLabels(models, xScale, yScale, labels, leaders, width) && topSpace < 1000) return renderChart(models, total, sourceInfo, topSpace + 80);
+    if (!renderLabels(models, xScale, yScale, labels, leaders, width, priceBoxes) && topSpace < 1000) return renderChart(models, total, sourceInfo, topSpace + 80);
     svg.onclick = event => { if (!event.target.closest('circle[data-aa3d-hit-id]')) { state.pinned = null; tooltip.hidden = true; } };
     status.textContent = `${models.length} of ${total} models shown · ${sourceInfo}`;
     chart.updatePan?.();
