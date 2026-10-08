@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.9
+// @version      2.5.10
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -690,10 +690,10 @@
       tails.append(svgEl('path', { d: outline, transform: 'translate(1 2)', fill: '#000', opacity: .10, 'pointer-events': 'none' }));
       const gradientId = `aa3d-callout-gradient-${tails.childElementCount}`;
       const gradient = svgEl('linearGradient', { id: gradientId, gradientUnits: 'userSpaceOnUse', x1: 0, y1: t, x2: 0, y2: b });
-      gradient.append(svgEl('stop', { offset: 0, 'stop-color': item.color, 'stop-opacity': .16 }), svgEl('stop', { offset: 1, 'stop-color': item.color, 'stop-opacity': .30 }));
+      gradient.append(svgEl('stop', { offset: 0, 'stop-color': '#fafbfc' }), svgEl('stop', { offset: 1, 'stop-color': '#e6e9ed' }));
       tails.append(gradient);
       tails.append(svgEl('path', { d: outline, fill: '#fff', 'pointer-events': 'none' }));
-      tails.append(svgEl('path', { d: outline, fill: `url(#${gradientId})`, stroke: item.color, 'stroke-opacity': .45, 'stroke-width': .7, 'stroke-linejoin': 'round', 'data-aa3d-tail': item.id, 'pointer-events': 'none' }));
+      tails.append(svgEl('path', { d: outline, fill: `url(#${gradientId})`, stroke: '#cbd0d6', 'stroke-width': .7, 'stroke-linejoin': 'round', 'data-aa3d-tail': item.id, 'pointer-events': 'none' }));
       const text = svgEl('text', { 'data-aa3d-id': item.id, 'data-aa3d-name': item.name, fill: '#262626', 'font-size': 11 });
       item.rows.forEach((row, index) => {
         const line = svgEl('tspan', { x: p.left + 8, y: p.top + 16 + index * 14, 'font-size': row.secondary ? 10 : 11, fill: row.secondary ? '#555' : '#262626' });
