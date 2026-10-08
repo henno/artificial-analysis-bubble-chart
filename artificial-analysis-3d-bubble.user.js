@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.10
+// @version      2.5.11
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -592,7 +592,7 @@
     if (previousLayout?.width === width && models.length > previousLayout.items.length * .8 && models.length < previousLayout.items.length * 1.2) {
       height = Math.max(height, Math.ceil(previousLayout.height * models.length / previousLayout.items.length));
     }
-    const directions = [[1, -1, 'NE'], [-1, -1, 'NW'], [1, 1, 'SE'], [-1, 1, 'SW']];
+    const directions = [[1, -1, 'NE'], [1, 1, 'SE']];
     let result;
     // Try numeric layouts before creating SVG elements. Each pass has a fixed limit.
     for (let pass = 0; pass < 12; pass++) {
