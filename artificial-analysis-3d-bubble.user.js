@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.2
+// @version      2.5.3
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -404,7 +404,7 @@
       const helpText = {
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
-        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. A price appears inside its bubble when it fits, or in the model label when it does not. The model variant is shown below the name. Labels appear in shaded callouts with diagonal pointers. The chart grows smoothly when labels need more space. Each price uses only enough decimal places to distinguish it from other visible prices, with at least cents and no trailing zeros. Free models show $0. Select a bubble for model details. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
+        bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. A price appears inside its bubble when it fits, or in the model label when it does not. The model variant is shown below the name. Labels appear in shaded callouts with diagonal pointers. The chart grows smoothly when labels need more space. Each price uses only enough decimal places to distinguish it from other visible prices, with at least cents and no trailing zeros. Free models show $0. Prices stay at the centre of small bubbles and can extend past their edge. If two prices overlap, one moves to its model callout. Select a bubble for model details. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
         dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. The Tolerance slider can also hide near matches. Open “Why models are hidden” below the filters for exact comparisons.',
         tolerance: 'Tolerance controls how close another model must be to hide this one. At 0%, the other model must be at least as smart, as fast, and as cheap, with a strict improvement in one measure. Above 0%, it may be worse by up to the selected percentage in each measure, but its largest percentage improvement must exceed its largest percentage disadvantage. Each percentage is measured against the model being hidden. For example, at 4%, a model that is 20% faster and 4% more expensive can hide another model if it is at least as smart. Use a higher value to remove near matches when a large benefit matters more to you than a small trade-off. A higher value can only hide more models. The purple 3D Pareto outlines always use exact values.',
       };
@@ -584,7 +584,7 @@
     };
     const prepared = models.map(model => {
       const price = chartPrice(model.cost), r = radius(model.cost);
-      const fontSize = [11, 10, 9, 8].find(size => textWidth(price, `600 ${size}px system-ui`) + 4 <= 2 * r && size + 4 <= 2 * r);
+      const fontSize = [11, 10, 9, 8].find(size => textWidth(price, `600 ${size}px system-ui`) + 4 <= 2 * r && size + 4 <= 2 * r) || 8;
       return { ...model, price, r, fontSize };
     });
     let height = Math.max(560, Math.ceil(models.length / 35) * 240, models.length > 70 ? models.length * 26 : 0);
@@ -605,7 +605,7 @@
       for (const item of [...items].sort((a, b) => b.cost - a.cost)) {
         const priceWidth = textWidth(item.price, `600 ${item.fontSize || 11}px system-ui`);
         const priceBox = { left: item.cx - priceWidth / 2, right: item.cx + priceWidth / 2, top: item.cy - 7, bottom: item.cy + 7 };
-        item.priceInside = !!item.fontSize && !priceBoxes.some(box => boxesOverlap(box, priceBox, 2));
+        item.priceInside = !priceBoxes.some(box => boxesOverlap(box, priceBox, 2));
         if (item.priceInside) priceBoxes.push(priceBox);
         item.rows = compactLabelRows(item.name, item.priceInside ? '' : item.price, measure);
         item.width = Math.max(...item.rows.map(row => modelNameWidth(row.value + (row.price && row.value ? ' · ' : ''), item.name, row.secondary, measure) + (row.price ? textWidth(row.price, '600 10px system-ui') : 0))) + 16;
@@ -618,6 +618,7 @@
           const value = minY + (maxY - minY) * tick / 5, y = yScale(value);
           labels.add({ left: plot.left - 12 - textWidth(value.toFixed(0), '10px system-ui'), right: plot.left - 5, top: y - 9, bottom: y + 6 });
         }
+        for (const box of priceBoxes) labels.add(box);
         failed = 0;
         for (const item of items) delete item.position;
         for (const item of [...items].sort((a, b) => order * (a.cy - b.cy) || a.cx - b.cx || a.id.localeCompare(b.id))) {
