@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.6.6
+// @version      2.6.7
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -386,7 +386,7 @@
           <button type="button" class="aa3d-clear">Clear filters</button>
         </div>
         <div class="aa3d-status" role="status"></div>
-        <details class="aa3d-missing" hidden><summary></summary><ul></ul></details><details class="aa3d-hidden-models" hidden><summary></summary><ul></ul></details>
+        <details class="aa3d-hidden-models" hidden><summary></summary><ul></ul></details>
         <section class="aa3d-unknown" hidden></section>
         <div class="aa3d-mobile-nav"><span>Swipe horizontally to see more</span><button type="button" data-pan="left" aria-label="Scroll chart left">←</button><button type="button" data-pan="right" aria-label="Scroll chart right">→</button></div>
         <div class="aa3d-plot"><svg role="group" aria-label="Intelligence Index by Time per Task; bubble diameter shows Cost per Task"></svg><div class="aa3d-tip" id="aa3d-tooltip" role="tooltip" hidden></div></div>`;
@@ -430,7 +430,7 @@
         #${ID} .aa3d-unknown-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:8px}
         #${ID} .aa3d-unknown-card{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafbfc}
         #${ID} .aa3d-unknown-card svg{width:28px;height:54px;flex:none}#${ID} .aa3d-unknown-card strong{font-size:12px}
-        #${ID} .aa3d-hit{fill:transparent;stroke:transparent;cursor:pointer}#${ID} .aa3d-hit:focus{fill:none;stroke:#111;stroke-width:2;outline:none}#${ID} details.aa3d-missing,#${ID} details.aa3d-hidden-models{margin:.25rem 0;font-size:11px;color:#555}#${ID} details ul{max-height:160px;overflow:auto;margin:.3rem 0;padding-left:1.4rem}#${ID} .aa3d-mobile-nav{display:none;align-items:center;gap:.4rem;margin:.5rem 0;color:#555;font-size:11px}#${ID} .aa3d-mobile-nav button{min-width:30px;min-height:30px;border:1px solid #ddd;border-radius:4px;background:#fff}#${ID} .aa3d-mobile-nav button:first-of-type{margin-left:auto}
+        #${ID} .aa3d-hit{fill:transparent;stroke:transparent;cursor:pointer}#${ID} .aa3d-hit:focus{fill:none;stroke:#111;stroke-width:2;outline:none}#${ID} details.aa3d-hidden-models{margin:.25rem 0;font-size:11px;color:#555}#${ID} details ul{max-height:160px;overflow:auto;margin:.3rem 0;padding-left:1.4rem}#${ID} .aa3d-mobile-nav{display:none;align-items:center;gap:.4rem;margin:.5rem 0;color:#555;font-size:11px}#${ID} .aa3d-mobile-nav button{min-width:30px;min-height:30px;border:1px solid #ddd;border-radius:4px;background:#fff}#${ID} .aa3d-mobile-nav button:first-of-type{margin-left:auto}
         @media(max-width:900px){#${ID} .aa3d-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:620px){#${ID}{padding:.65rem}#${ID} .aa3d-head{flex-wrap:wrap}#${ID} .aa3d-picker-wrap,#${ID} .aa3d-model-picker{width:100%;max-width:none}#${ID} .aa3d-search-wrap{min-width:100%;max-width:none;margin-left:0}#${ID} .aa3d-filters{grid-template-columns:1fr}#${ID} .aa3d-mobile-nav{display:flex}}
       `;
@@ -1238,15 +1238,7 @@
     section.append(heading, note, list);
   }
 
-  function updateExplanations(allModels, missing, hidden) {
-    const missingBox = chart.querySelector('.aa3d-missing');
-    missingBox.hidden = missing.length === 0;
-    missingBox.querySelector('summary').textContent = `${missing.length} selected ${missing.length === 1 ? 'model has' : 'models have'} missing chart data`;
-    missingBox.querySelector('ul').replaceChildren(...missing.map(({ model, metrics }) => {
-      const item = document.createElement('li');
-      item.textContent = `${model.name}: missing ${metrics.join(', ')}`;
-      return item;
-    }));
+  function updateExplanations(allModels, hidden) {
     const hiddenBox = chart.querySelector('.aa3d-hidden-models');
     hiddenBox.hidden = !state.hideDominated || hidden.length === 0;
     hiddenBox.querySelector('summary').textContent = `Why ${hidden.length} ${hidden.length === 1 ? 'model is' : 'models are'} hidden`;
@@ -1278,7 +1270,6 @@
     updateModelPicker(data);
     const rawModels = modelMetrics(data.models, data.colorById, data.colorByProvider)
       .filter(model => ['intelligence', 'time', 'cost'].some(key => knownMetric(model, key)));
-    const missing = rawModels.map(model => ({ model, metrics: missingMetrics(model) })).filter(item => item.metrics.length);
     const all = rawModels.filter(model => !missingMetrics(model).length);
     comparisonModels = all;
     syncSliders(state.showMissing ? rawModels : all);
@@ -1308,7 +1299,7 @@
     const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.releaseDate, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.showMissing, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
-    updateExplanations(state.showMissing ? rawModels : all, missing, hidden);
+    updateExplanations(state.showMissing ? rawModels : all, hidden);
     chart.querySelector('.aa3d-missing-key').hidden = !state.showMissing;
     const unknownIntelligence = models.filter(model => !knownMetric(model, 'intelligence'));
     renderUnknownIntelligence(unknownIntelligence);
