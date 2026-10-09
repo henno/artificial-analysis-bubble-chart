@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.25
+// @version      2.5.26
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -368,7 +368,14 @@
         #${ID} .aa3d-clear{height:30px;padding:0 .6rem;border:1px solid #ddd;border-radius:5px;background:#f8f8f8;color:#333;cursor:pointer}
         #${ID} input[type=checkbox]{accent-color:#6d36a3}#${ID} .aa3d-status{min-height:1.2em;color:#666;font-size:11px}
         #${ID} .aa3d-plot{position:relative;width:100%;overflow-x:auto;overflow-y:hidden;transition:height 320ms ease} @media(prefers-reduced-motion:reduce){#${ID} .aa3d-plot{transition:none}}#${ID} svg{display:block;width:100%;height:auto}
-        #${ID} .aa3d-tip{position:absolute;z-index:5;max-width:270px;padding:.55rem .7rem;border:1px solid #d4d4d4;border-radius:5px;background:#fff;box-shadow:0 3px 12px #0002;pointer-events:auto;white-space:pre-line;line-height:1.5}
+        #${ID} .aa3d-tip{position:absolute;z-index:5;width:380px;max-width:calc(100% - 8px);padding:.65rem .75rem;border:1px solid #d4d4d4;border-radius:7px;background:#fff;box-shadow:0 3px 12px #0002;pointer-events:auto;white-space:normal;line-height:1.4}
+        #${ID} .aa3d-metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;font-size:13px;font-variant-numeric:tabular-nums}
+        #${ID} .aa3d-metric-caption{display:block;font-size:11px;color:#666;font-weight:400}
+        #${ID} .aa3d-metric-change{display:block;margin-top:3px;font-size:11px;font-weight:600}
+        #${ID} .aa3d-metric-change[data-change=better]{color:#167043}#${ID} .aa3d-metric-change[data-change=worse]{color:#a34b0b}#${ID} .aa3d-metric-change[data-change=equal]{color:#737373}
+        #${ID} .aa3d-better{margin-top:10px;padding-top:8px;border-top:1px solid #e5e5e5}
+        #${ID} .aa3d-better-list{display:grid;gap:7px;margin-top:8px;max-height:260px;overflow:auto;overscroll-behavior:contain}
+        #${ID} .aa3d-better-card{padding:8px;border:1px solid #e5e7eb;border-radius:7px;background:linear-gradient(#fafbfc,#f3f4f6)}
         #${ID} .aa3d-hit{fill:transparent;stroke:transparent;cursor:pointer}#${ID} .aa3d-hit:focus{fill:none;stroke:#111;stroke-width:2;outline:none}#${ID} details.aa3d-missing,#${ID} details.aa3d-hidden-models{margin:.25rem 0;font-size:11px;color:#555}#${ID} details ul{max-height:160px;overflow:auto;margin:.3rem 0;padding-left:1.4rem}#${ID} .aa3d-mobile-nav{display:none;align-items:center;gap:.4rem;margin:.5rem 0;color:#555;font-size:11px}#${ID} .aa3d-mobile-nav button{min-width:30px;min-height:30px;border:1px solid #ddd;border-radius:4px;background:#fff}#${ID} .aa3d-mobile-nav button:first-of-type{margin-left:auto}
         @media(max-width:900px){#${ID} .aa3d-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:620px){#${ID}{padding:.65rem}#${ID} .aa3d-head{flex-wrap:wrap}#${ID} .aa3d-picker-wrap,#${ID} .aa3d-model-picker{width:100%;max-width:none}#${ID} .aa3d-search-wrap{min-width:100%;max-width:none;margin-left:0}#${ID} .aa3d-filters{grid-template-columns:1fr}#${ID} .aa3d-mobile-nav{display:flex}}
@@ -1004,29 +1011,66 @@
   }
 
   function showTooltip(model, circle, price) {
-    tooltip.textContent = `${model.name}\n${model.provider}\nIntelligence Index: ${model.intelligence.toFixed(2)}\nTime per Task: ${model.time.toFixed(2)} min\nCost per Task: ${price}\n2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
-    const section = document.createElement('div');
-    section.style.cssText = 'margin-top:.5rem;padding-top:.4rem;border-top:1px solid #ddd;white-space:normal';
-    const heading = document.createElement('strong'); heading.textContent = 'Better models';
-    const note = document.createElement('div'); note.textContent = `Within the AA model selection · Tolerance: ${state.dominanceTolerance}%`;
-    note.style.cssText = 'font-size:10px;color:#666';
-    section.append(heading, note);
-    if (missingMetrics(model).length) {
-      const message = document.createElement('div'); message.textContent = 'Cannot compare: this model has missing data.'; section.append(message);
-    } else {
-      const better = comparisonModels.filter(other => dominates(model, other, state.dominanceTolerance / 100))
-        .sort((a, b) => b.intelligence - a.intelligence || a.cost - b.cost || a.time - b.time);
-      if (!better.length) {
-        const message = document.createElement('div'); message.textContent = 'No better model at this tolerance.'; section.append(message);
-      } else {
-        const list = document.createElement('ul'); list.style.cssText = 'margin:.3rem 0 0;padding-left:1rem;max-height:200px;overflow:auto';
-        better.forEach(other => {
-          const row = document.createElement('li');
-          const name = document.createElement('strong'); name.textContent = other.name;
-          const values = document.createElement('div'); values.textContent = `Intelligence: ${other.intelligence.toFixed(2)} · Time: ${other.time.toFixed(2)} min · Cost: ${detailPrice(other.cost)}`;
-          row.append(name, values); list.append(row);
-        }); section.append(list);
+    tooltip.replaceChildren();
+    const title = document.createElement('strong'); title.textContent = model.name;
+    title.style.cssText = 'display:block;font-size:13px;line-height:1.3';
+    const provider = document.createElement('div'); provider.textContent = model.provider;
+    provider.style.cssText = 'color:#777;font-size:11px;margin:2px 0 6px';
+    const metricGrid = other => {
+      const grid = document.createElement('div'); grid.className = 'aa3d-metric-grid';
+      for (const [key, label, value, higher] of [
+        ['intelligence', 'Intelligence', other.intelligence.toFixed(2), true],
+        ['time', 'Time / task', `${other.time.toFixed(2)} min`, false],
+        ['cost', 'Cost / task', other.id === model.id ? price : detailPrice(other.cost), false],
+      ]) {
+        const cell = document.createElement('div');
+        const caption = document.createElement('span'); caption.className = 'aa3d-metric-caption'; caption.textContent = label;
+        const number = document.createElement('strong'); number.textContent = value;
+        cell.append(caption, number);
+        if (other.id !== model.id) {
+          const difference = other[key] - model[key];
+          const gain = higher ? difference : -difference;
+          const delta = document.createElement('span'); delta.className = 'aa3d-metric-change';
+          delta.dataset.change = gain > 0 ? 'better' : gain < 0 ? 'worse' : 'equal';
+          const percent = model[key] > 0 ? Math.abs(difference) / model[key] * 100 : null;
+          const direction = key === 'intelligence' ? (gain > 0 ? 'higher' : 'lower') : key === 'time' ? (gain > 0 ? 'faster' : 'slower') : (gain > 0 ? 'cheaper' : 'more expensive');
+          const magnitude = percent !== null && percent < .1 ? '<0.1%' : `${Number(percent?.toFixed(1))}%`;
+          delta.textContent = gain === 0 ? 'Same' : percent === null ? direction : `${magnitude} ${direction}`;
+          cell.append(delta);
+        }
+        grid.append(cell);
       }
+      return grid;
+    };
+    tooltip.append(title, provider, metricGrid(model));
+    const pareto = document.createElement('div'); pareto.className = 'aa3d-metric-caption';
+    pareto.textContent = `2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
+    pareto.style.marginTop = '5px'; tooltip.append(pareto);
+    const section = document.createElement('div'); section.className = 'aa3d-better';
+    const incomplete = missingMetrics(model).length > 0;
+    const better = incomplete ? [] : comparisonModels.filter(other => dominates(model, other, state.dominanceTolerance / 100))
+      .sort((a, b) => b.intelligence - a.intelligence || a.cost - b.cost || a.time - b.time);
+    const heading = document.createElement('strong'); heading.textContent = `Better models${better.length ? ` (${better.length})` : ''}`;
+    const note = document.createElement('div'); note.className = 'aa3d-metric-caption';
+    note.textContent = `AA selection · Tolerance ${state.dominanceTolerance}% · Compared with this model`;
+    section.append(heading, note);
+    if (!better.length) {
+      const message = document.createElement('div'); message.textContent = incomplete ? 'Cannot compare: this model has missing data.' : 'No better model at this tolerance.';
+      message.style.marginTop = '8px'; section.append(message);
+    } else {
+      const list = document.createElement('div'); list.className = 'aa3d-better-list';
+      better.forEach(other => {
+        const card = document.createElement('div'); card.className = 'aa3d-better-card';
+        const name = document.createElement('strong'); name.style.cssText = 'display:block;font-size:12px;line-height:1.3;margin-bottom:6px';
+        const variant = other.name.match(/^(.+?)\s+\((.+)\)$/);
+        name.textContent = variant ? variant[1] : other.name;
+        card.append(name);
+        if (variant) {
+          const detail = document.createElement('div'); detail.className = 'aa3d-metric-caption';
+          detail.textContent = variant[2]; detail.style.margin = '-4px 0 7px'; card.append(detail);
+        }
+        card.append(metricGrid(other)); list.append(card);
+      }); section.append(list);
     }
     tooltip.append(section);
     tooltip.hidden = false;
@@ -1036,6 +1080,7 @@
     const left = circleBox.left - chartBox.left + plotElement.scrollLeft + circleBox.width / 2 + 12;
     tooltip.style.left = `${Math.max(plotElement.scrollLeft + 4, Math.min(left, plotElement.scrollLeft + plotElement.clientWidth - tooltip.offsetWidth - 4))}px`;
     tooltip.style.top = `${Math.max(0, circleBox.top - chartBox.top - tooltip.offsetHeight - 8)}px`;
+    tooltip.onclick = event => event.stopPropagation();
   }
 
   function updateExplanations(allModels, missing, hidden) {
