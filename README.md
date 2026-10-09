@@ -26,13 +26,14 @@ Artificial Analysis lists more than 600 models. Showing many models at once make
 - See a dashed two-dimensional Pareto line and purple outlines for the exact three-dimensional Pareto set. Click the `?` buttons in the chart for explanations.
 - Open “Why models are hidden” to see which model and values caused each model to be hidden.
 - See which selected models have missing Intelligence Index, time, or cost data.
+- Turn on **Show models with missing data** to display them. A horizontal stripe means time is unknown, a vertical line means intelligence is unknown, and an X means cost is unknown. Stripe labels can move along the stripe; their horizontal position does not show task time. In crowded views, select a stripe for details or filter by model or provider to show individual stripe labels. Models with neither intelligence nor time are shown in a marked area outside the numeric axes.
 - Select a bubble to see its values. Bubbles support touch, mouse, and keyboard. On a phone, swipe the chart or use its left and right buttons.
 
 Settings are saved in your browser and restored after a page reload. **Clear filters** restores the AA model selection you had before filtering.
 
 ## Data and limits
 
-The script reads data from the open AA page. A model needs all three metrics to appear in the bubble chart. AA can change its page structure or data format, which may require a script update. Bubble diameters use the highest cost among currently visible models. Select a bubble to see its cost as a number.
+The script reads data from the open AA page. Models with missing values are hidden unless **Show models with missing data** is on. Filters use known values only. Missing values are never treated as zero. Models with missing data are not part of dominance or Pareto comparisons. AA can change its page structure or data format, which may require a script update. Bubble diameters use the highest cost among currently visible models. Select a bubble to see its cost as a number.
 
 The script does not send data to another server. Tampermonkey checks GitHub for updates. This is an independent addition and is not an official Artificial Analysis feature.
 

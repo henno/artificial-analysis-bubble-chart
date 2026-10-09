@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.26
+// @version      2.6.0
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -20,7 +20,7 @@
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 4;
   const NS = 'http://www.w3.org/2000/svg';
-  const state = { compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
+  const state = { showMissing: false, compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
   const filterMetrics = [
     { metric: 'intelligence', key: 'intelligenceMin', direction: 'min', step: 0.1, digits: 1 },
     { metric: 'time', key: 'timeMax', step: 0.1, digits: 1 },
@@ -30,6 +30,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (!saved || typeof saved !== 'object') return;
+      if (typeof saved.showMissing === 'boolean') state.showMissing = saved.showMissing;
       if (typeof saved.compactVertical === 'boolean') state.compactVertical = saved.compactVertical;
       if (typeof saved.hideDominated === 'boolean') state.hideDominated = saved.hideDominated;
       // Existing users keep their AA model selection. New users select all models once.
@@ -46,7 +47,7 @@
   function saveSettings() {
     const filters = Object.fromEntries(filterMetrics.filter(({ key }) => Number.isFinite(state.filters[key])).map(({ key }) => [key, state.filters[key]]));
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ showMissing: state.showMissing, compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
     } catch (_) { /* Keep the current page usable if storage is unavailable. */ }
   }
   restoreSettings();
@@ -148,12 +149,16 @@
     return missing;
   }
 
+  function knownMetric(model, key) {
+    return finite(model[key]) && (key === 'intelligence' || model[key] >= 0);
+  }
+
   function compute2DPareto(models) {
     return models.filter(a => !models.some(b => b.id !== a.id && b.time <= a.time && b.intelligence >= a.intelligence && (b.time < a.time || b.intelligence > a.intelligence)));
   }
 
   function dominates(a, b, tolerance = 0) {
-    if (b.id === a.id) return false;
+    if (b.id === a.id || missingMetrics(a).length || missingMetrics(b).length) return false;
     const exact = b.time <= a.time && b.cost <= a.cost && b.intelligence >= a.intelligence && (b.time < a.time || b.cost < a.cost || b.intelligence > a.intelligence);
     if (exact || !tolerance) return exact;
     const relative = (difference, baseline) => difference <= 0 ? 0 : baseline > 0 ? difference / baseline : Infinity;
@@ -168,7 +173,7 @@
   }
 
   function hasNativeModelFilter() {
-    return state.hideDominated || state.search.trim() !== '' || filterMetrics.some(({ key }) => state.filters[key] != null && state.filters[key] !== '');
+    return state.showMissing || state.hideDominated || state.search.trim() !== '' || filterMetrics.some(({ key }) => state.filters[key] != null && state.filters[key] !== '');
   }
 
   function getSearchMatcher() {
@@ -245,8 +250,7 @@
       saveSettings();
     }
 
-    // Use the models visible after search, sliders, and optional Pareto filtering.
-    // Models without all three metrics cannot appear in the bubble chart.
+    // Use the models visible after the chart filters, including optional missing-data marks.
     const shownIds = new Set(shownModels.map(model => model.id));
     const chosen = state.nativeBaseIds.map(id => byId.get(id)).filter(model => model && shownIds.has(model.id));
     const chosenIds = chosen.map(model => model.id);
@@ -325,9 +329,11 @@
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label><button type="button" class="aa3d-help-button" data-help="tolerance" aria-label="Explain tolerance" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
+          <label title="Show missing time as a horizontal stripe, missing intelligence as a vertical line, and missing cost as an X. These models are not part of Pareto comparisons."><input type="checkbox" data-control="showMissing"> Show models with missing data</label>
           <label title="Reduce vertical space without overlapping model labels. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
+        <p class="aa3d-missing-key" hidden>Missing data: horizontal stripe = time unknown · vertical line = intelligence unknown · X = cost unknown. Stripe labels do not show task time. Select a stripe or X for details. Filter by model or provider to see individual labels for crowded stripes. Filters use known values only. These models are not part of Pareto comparisons.</p>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
         <p class="aa3d-search-error" id="aa3d-search-error" role="alert" hidden></p>
         <p class="aa3d-filter-note">Search and filters also update AA's other charts. Clear filters to restore your AA model selection.</p>
@@ -339,6 +345,7 @@
         </div>
         <div class="aa3d-status" role="status"></div>
         <details class="aa3d-missing" hidden><summary></summary><ul></ul></details><details class="aa3d-hidden-models" hidden><summary></summary><ul></ul></details>
+        <section class="aa3d-unknown" hidden></section>
         <div class="aa3d-mobile-nav"><span>Swipe horizontally to see more</span><button type="button" data-pan="left" aria-label="Scroll chart left">←</button><button type="button" data-pan="right" aria-label="Scroll chart right">→</button></div>
         <div class="aa3d-plot"><svg role="group" aria-label="Intelligence Index by Time per Task; bubble diameter shows Cost per Task"></svg><div class="aa3d-tip" id="aa3d-tooltip" role="tooltip" hidden></div></div>`;
       const style = document.createElement('style');
@@ -376,6 +383,10 @@
         #${ID} .aa3d-better{margin-top:10px;padding-top:8px;border-top:1px solid #e5e5e5}
         #${ID} .aa3d-better-list{display:grid;gap:7px;margin-top:8px;max-height:260px;overflow:auto;overscroll-behavior:contain}
         #${ID} .aa3d-better-card{padding:8px;border:1px solid #e5e7eb;border-radius:7px;background:linear-gradient(#fafbfc,#f3f4f6)}
+        #${ID} .aa3d-unknown{margin-top:12px;padding-top:10px;border-top:1px solid #ddd}#${ID} .aa3d-unknown h4{margin:0;font-size:13px}
+        #${ID} .aa3d-unknown-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin-top:8px}
+        #${ID} .aa3d-unknown-card{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafbfc}
+        #${ID} .aa3d-unknown-card svg{width:28px;height:54px;flex:none}#${ID} .aa3d-unknown-card strong{font-size:12px}
         #${ID} .aa3d-hit{fill:transparent;stroke:transparent;cursor:pointer}#${ID} .aa3d-hit:focus{fill:none;stroke:#111;stroke-width:2;outline:none}#${ID} details.aa3d-missing,#${ID} details.aa3d-hidden-models{margin:.25rem 0;font-size:11px;color:#555}#${ID} details ul{max-height:160px;overflow:auto;margin:.3rem 0;padding-left:1.4rem}#${ID} .aa3d-mobile-nav{display:none;align-items:center;gap:.4rem;margin:.5rem 0;color:#555;font-size:11px}#${ID} .aa3d-mobile-nav button{min-width:30px;min-height:30px;border:1px solid #ddd;border-radius:4px;background:#fff}#${ID} .aa3d-mobile-nav button:first-of-type{margin-left:auto}
         @media(max-width:900px){#${ID} .aa3d-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:620px){#${ID}{padding:.65rem}#${ID} .aa3d-head{flex-wrap:wrap}#${ID} .aa3d-picker-wrap,#${ID} .aa3d-model-picker{width:100%;max-width:none}#${ID} .aa3d-search-wrap{min-width:100%;max-width:none;margin-left:0}#${ID} .aa3d-filters{grid-template-columns:1fr}#${ID} .aa3d-mobile-nav{display:flex}}
@@ -535,7 +546,8 @@
   function syncSliders(models) {
     if (!models.length) return;
     for (const config of filterMetrics) {
-      const high = Number((Math.ceil(Math.max(...models.map(model => model[config.metric])) / config.step) * config.step).toFixed(config.digits));
+      const values = models.filter(model => knownMetric(model, config.metric)).map(model => model[config.metric]);
+      const high = Number((Math.ceil(Math.max(0, ...values) / config.step) * config.step).toFixed(config.digits));
       const end = Math.max(config.step, high);
       const input = chart.querySelector(`[data-filter="${config.key}"]`);
       const number = chart.querySelector(`[data-number="${config.key}"]`);
@@ -635,21 +647,29 @@
     };
   }
 
-  function arrangeCallouts(models, width, measure, chartPrice, radius) {
-    const minX = Math.max(0, Math.min(...models.map(m => m.time)) - 1);
-    const maxX = Math.max(...models.map(m => m.time)) + 1;
-    const minY = Math.min(...models.map(m => m.intelligence));
-    const maxY = Math.max(minY + .01, ...models.map(m => m.intelligence));
+  function arrangeCallouts(models, width, measure, chartPrice, radius, domainModels = models) {
+    const times = domainModels.filter(model => knownMetric(model, 'time')).map(model => model.time);
+    const minX = Math.max(0, (times.length ? Math.min(...times) : 0) - 1);
+    const maxX = Math.max(minX + 1, ...times) + 1;
+    const intelligenceValues = domainModels.filter(model => knownMetric(model, 'intelligence')).map(model => model.intelligence);
+    const minY = Math.min(...intelligenceValues);
+    const maxY = Math.max(minY + .01, ...intelligenceValues);
     const widths = new Map();
     const textWidth = (text, font) => {
       const key = `${font}:${text}`;
       if (!widths.has(key)) { measure.font = font; widths.set(key, measure.measureText(text).width); }
       return widths.get(key);
     };
+    const stripePositions = new Map(models.filter(model => !knownMetric(model, 'time'))
+      .sort((a, b) => b.intelligence - a.intelligence || a.id.localeCompare(b.id))
+      .map((model, index) => [model.id, .05 + (index * .61803398875 % 1) * .9]));
     const prepared = models.map(model => {
-      const price = chartPrice(model.cost), r = radius(model.cost);
+      const missingTime = !knownMetric(model, 'time'), missingCost = !knownMetric(model, 'cost');
+      const price = missingCost ? 'Cost unknown' : chartPrice(model.cost), r = missingTime || missingCost ? 6 : radius(model.cost);
+      // A stripe has no time position. Spread its label anchors across the stripe.
+      const timeFraction = stripePositions.get(model.id);
       const fontSize = [11, 10, 9, 8].find(size => textWidth(price, `600 ${size}px system-ui`) + 4 <= 2 * r && size + 4 <= 2 * r) || 8;
-      return { ...model, price, r, fontSize };
+      return { ...model, missingTime, missingCost, timeFraction, price, r, fontSize };
     });
     let height = Math.max(560, Math.ceil(models.length / 35) * 240, models.length > 70 ? models.length * 26 : 0);
     const previousLayout = lastLayout?.value;
@@ -664,15 +684,16 @@
       const xScale = value => plot.left + (value - minX) / (maxX - minX) * (plot.right - plot.left);
       const yScale = value => plot.bottom - (value - minY) / (maxY - minY) * (plot.bottom - plot.top);
       const bubbles = spatialIndex(), priceBoxes = [];
-      const items = prepared.map(item => ({ ...item, cx: xScale(item.time), cy: yScale(item.intelligence) }));
+      const items = prepared.map(item => ({ ...item, cx: item.missingTime ? plot.left + item.timeFraction * (plot.right - plot.left) : xScale(item.time), cy: yScale(item.intelligence) }));
       for (const item of items) bubbles.add({ left: item.cx - item.r - 3, right: item.cx + item.r + 3, top: item.cy - item.r - 3, bottom: item.cy + item.r + 3, item });
       for (const item of [...items].sort((a, b) => b.cost - a.cost)) {
         const priceWidth = textWidth(item.price, `600 ${item.fontSize || 11}px system-ui`);
         item.priceWidth = priceWidth;
         const priceBox = { priceId: item.id, left: item.cx - priceWidth / 2, right: item.cx + priceWidth / 2, top: item.cy - 7, bottom: item.cy + 7 };
-        item.priceInside = !priceBoxes.some(box => boxesOverlap(box, priceBox, 2));
+        item.priceInside = !item.missingTime && !item.missingCost && !priceBoxes.some(box => boxesOverlap(box, priceBox, 2));
         if (item.priceInside) priceBoxes.push(priceBox);
         item.rows = compactLabelRows(item.name, item.priceInside ? '' : item.price, measure);
+        if (item.missingTime) item.rows.push({ value: 'Time unknown', secondary: true });
         item.width = Math.max(...item.rows.map(row => modelNameWidth(row.value + (row.price && row.value ? ' · ' : ''), item.name, row.secondary, measure) + (row.price ? textWidth(row.price, '600 10px system-ui') : 0))) + 8;
         item.height = item.rows.length * 14 + 4;
       }
@@ -689,28 +710,34 @@
         for (const item of [...items].sort((a, b) => order * (a.cy - b.cy) || a.cx - b.cx || a.id.localeCompare(b.id))) {
           const previous = labelPositions.get(item.id);
           const ordered = previous ? [...directions].sort((a, b) => Number(b[2] === previous) - Number(a[2] === previous)) : directions;
-          search: for (const gap of [9, 19, 33, 51, 75, 105, 141]) {
-            for (const [dx, dy, direction] of ordered) for (const angle of [45, 25, 65, 15, 75]) {
-              const ux = dx * Math.cos(angle * Math.PI / 180), uy = dy * Math.sin(angle * Math.PI / 180);
-              const cornerX = item.cx + ux * (item.r + gap), cornerY = item.cy + uy * (item.r + gap);
-              const box = { left: cornerX - (dx < 0 ? item.width : 0), top: cornerY - (dy < 0 ? item.height : 0) };
-              box.right = box.left + item.width; box.bottom = box.top + item.height;
-              if (box.left < 30 || box.right > width - 8 || box.top < 8 || box.bottom > height - 82) continue;
-              const shapes = calloutShapes(box, item, cornerX, cornerY, dx, dy, ux, uy);
-              const points = shapes.flat();
-              const occupied = { left: Math.min(...points.map(p => p[0])) - 3, right: Math.max(...points.map(p => p[0])) + 3, top: Math.min(...points.map(p => p[1])) - 3, bottom: Math.max(...points.map(p => p[1])) + 3, shapes };
-              if ([...labels.near(occupied)].some(other => {
-                if (!boxesOverlap(occupied, other, 0)) return false;
-                const otherShapes = other.shapes || [[[other.left, other.top], [other.right, other.top], [other.right, other.bottom], [other.left, other.bottom]]];
-                return (other.priceId ? [shapes[0]] : shapes).some(a => otherShapes.some(b => polygonsOverlap(a, b)));
-              })) continue;
-              if ([...bubbles.near(box)].some(other => {
-                const m = other.item, x = m.cx - Math.max(box.left, Math.min(m.cx, box.right)), y = m.cy - Math.max(box.top, Math.min(m.cy, box.bottom));
-                return x * x + y * y < (m.r + 3) ** 2;
-              })) continue;
-              item.position = { ...box, cornerX, cornerY, dx, dy, ux, uy, direction, gap };
-              labels.add(occupied);
-              break search;
+          search: for (const fraction of item.missingTime ? [item.timeFraction, .05, .25, .45, .65, .85, .95] : [null]) {
+            if (fraction !== null) {
+              item.cx = plot.left + fraction * (plot.right - plot.left);
+              bubbles.add({ left: item.cx - item.r - 3, right: item.cx + item.r + 3, top: item.cy - item.r - 3, bottom: item.cy + item.r + 3, item });
+            }
+            for (const gap of [9, 19, 33, 51, 75, 105, 141]) {
+              for (const [dx, dy, direction] of ordered) for (const angle of [45, 25, 65, 15, 75]) {
+                const ux = dx * Math.cos(angle * Math.PI / 180), uy = dy * Math.sin(angle * Math.PI / 180);
+                const cornerX = item.cx + ux * (item.r + gap), cornerY = item.cy + uy * (item.r + gap);
+                const box = { left: cornerX - (dx < 0 ? item.width : 0), top: cornerY - (dy < 0 ? item.height : 0) };
+                box.right = box.left + item.width; box.bottom = box.top + item.height;
+                if (box.left < 30 || box.right > width - 8 || box.top < 8 || box.bottom > height - 82) continue;
+                const shapes = calloutShapes(box, item, cornerX, cornerY, dx, dy, ux, uy);
+                const points = shapes.flat();
+                const occupied = { left: Math.min(...points.map(p => p[0])) - 3, right: Math.max(...points.map(p => p[0])) + 3, top: Math.min(...points.map(p => p[1])) - 3, bottom: Math.max(...points.map(p => p[1])) + 3, shapes };
+                if ([...labels.near(occupied)].some(other => {
+                  if (!boxesOverlap(occupied, other, 0)) return false;
+                  const otherShapes = other.shapes || [[[other.left, other.top], [other.right, other.top], [other.right, other.bottom], [other.left, other.bottom]]];
+                  return (other.priceId ? [shapes[0]] : shapes).some(a => otherShapes.some(b => polygonsOverlap(a, b)));
+                })) continue;
+                if ([...bubbles.near(box)].some(other => {
+                  const m = other.item, x = m.cx - Math.max(box.left, Math.min(m.cx, box.right)), y = m.cy - Math.max(box.top, Math.min(m.cy, box.bottom));
+                  return x * x + y * y < (m.r + 3) ** 2;
+                })) continue;
+                item.position = { ...box, cornerX, cornerY, dx, dy, ux, uy, direction, gap };
+                labels.add(occupied);
+                break search;
+              }
             }
           }
           if (!item.position) failed++;
@@ -927,16 +954,21 @@
     }
   }
 
-  function renderChart(models, total, sourceInfo) {
+  function renderChart(models, total, sourceInfo, unknownIntelligence = []) {
+    const complete = models.filter(model => !missingMetrics(model).length);
     tooltip.hidden = true;
     const plotElement = chart.querySelector('.aa3d-plot');
     const width = Math.max(900, Math.round(plotElement.clientWidth));
-    const maxCost = Math.max(...models.map(model => model.cost));
-    const chartPrice = chartPriceFormatter(models);
+    const pricedModels = [...models, ...unknownIntelligence].filter(model => knownMetric(model, 'cost'));
+    const maxCost = Math.max(0, ...pricedModels.map(model => model.cost));
+    const chartPrice = chartPriceFormatter(pricedModels);
     const measure = document.createElement('canvas').getContext('2d');
     const radius = cost => maxCost === 0 ? 43 : Math.max(3, 43 * cost / maxCost);
-    const layoutKey = JSON.stringify([width, state.compactVertical, models.map(m => [m.id, m.name, m.time, m.intelligence, m.cost])]);
-    if (lastLayout?.key !== layoutKey) lastLayout = { key: layoutKey, value: arrangeCallouts(models, width, measure, chartPrice, radius) };
+    const stripes = models.filter(model => !knownMetric(model, 'time'));
+    const labeledModels = models.filter(model => knownMetric(model, 'time') || stripes.length <= 35 || knownMetric(model, 'cost'));
+    if (!labeledModels.length) labeledModels.push(models[0]);
+    const layoutKey = JSON.stringify([width, state.compactVertical, [...models, ...unknownIntelligence].map(m => [m.id, m.name, m.time, m.intelligence, m.cost])]);
+    if (lastLayout?.key !== layoutKey) lastLayout = { key: layoutKey, value: arrangeCallouts(labeledModels, width, measure, chartPrice, radius, [...models, ...unknownIntelligence]) };
     const layout = lastLayout.value;
     const { height, plot, xScale, yScale, minX, maxX, minY, maxY } = layout;
     const byId = new Map(layout.items.map(item => [item.id, item]));
@@ -945,12 +977,14 @@
     svg.style.height = `${height}px`;
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     resizePlot(height);
-    const pareto2 = new Set(compute2DPareto(models).map(m => m.id));
-    const pareto3 = new Set(compute3DPareto(models).map(m => m.id));
+    const pareto2 = new Set(compute2DPareto(complete).map(m => m.id));
+    const pareto3 = new Set(compute3DPareto(complete).map(m => m.id));
     models.forEach(m => { m.pareto2 = pareto2.has(m.id); m.pareto3 = pareto3.has(m.id); });
 
     const grid = svgEl('g'), frontier = svgEl('g'), leaders = svgEl('g'), bubbles = svgEl('g'), prices = svgEl('g'), labels = svgEl('g'), hits = svgEl('g');
     svg.append(grid, frontier, bubbles, leaders, prices, labels, hits);
+    const stripeHits = svgEl('g'), pointHits = svgEl('g');
+    hits.append(stripeHits, pointHits);
     for (const value of integerTicks(minY, maxY, Math.ceil(maxY - minY) + 1)) {
       const y = yScale(value);
       grid.append(svgEl('line', { x1: plot.left, y1: y, x2: plot.right, y2: y, stroke: '#e6e6e6' }));
@@ -979,22 +1013,10 @@
       frontier.append(svgEl('polyline', { points: points.map(m => `${xScale(m.time)},${yScale(m.intelligence)}`).join(' '), fill: 'none', stroke: '#333', 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'pointer-events': 'none' }));
     }
 
-    [...models].sort((a, b) => b.cost - a.cost).forEach(model => {
-      const cx = xScale(model.time), cy = yScale(model.intelligence), r = radius(model.cost);
-      const gradientId = `aa3d-circle-gradient-${bubbles.childElementCount}`;
-      const gradient = svgEl('linearGradient', { id: gradientId, gradientUnits: 'userSpaceOnUse', x1: 0, y1: cy - r, x2: 0, y2: cy + r });
-      gradient.append(svgEl('stop', { offset: 0, 'stop-color': model.color, 'stop-opacity': .16 }), svgEl('stop', { offset: 1, 'stop-color': model.color, 'stop-opacity': .30 }));
-      bubbles.append(gradient);
-      const circle = svgEl('circle', { cx, cy, r, fill: `url(#${gradientId})`, stroke: model.pareto3 ? '#7837aa' : model.color, 'stroke-opacity': model.pareto3 ? .9 : .45, 'stroke-width': model.pareto3 ? 2 : 1, 'data-aa3d-id': model.id, style: 'cursor:pointer' });
-      circle.setAttribute('pointer-events', 'none');
-      bubbles.append(circle);
-      const price = chartPrice(model.cost);
-      const item = byId.get(model.id);
-      if (item.priceInside) {
-        const text = svgEl('text', { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': item.fontSize, 'font-weight': 600, fill: '#171717', stroke: '#fff', 'stroke-width': 1.5, 'paint-order': 'stroke', 'pointer-events': 'none', 'aria-hidden': 'true', 'data-aa3d-price-id': model.id });
-        text.textContent = price; prices.append(text);
-      }
-      const hit = svgEl('circle', { cx, cy, r: Math.max(12, r), class: 'aa3d-hit', 'data-aa3d-hit-id': model.id, tabindex: '0', role: 'button', 'aria-label': `${model.name}: Intelligence Index ${model.intelligence.toFixed(2)}, time ${model.time.toFixed(2)} minutes, cost ${price}`, 'aria-describedby': 'aa3d-tooltip' });
+    const bindHit = (model, hit, price) => {
+      hit.setAttribute('class', 'aa3d-hit'); hit.setAttribute('data-aa3d-hit-id', model.id);
+      hit.setAttribute('tabindex', '0'); hit.setAttribute('role', 'button'); hit.setAttribute('aria-describedby', 'aa3d-tooltip');
+      hit.setAttribute('aria-label', `${model.name}: Intelligence ${knownMetric(model, 'intelligence') ? model.intelligence.toFixed(2) : 'unknown'}, time ${knownMetric(model, 'time') ? model.time.toFixed(2) + ' minutes' : 'unknown'}, cost ${price}`);
       hit.addEventListener('pointerenter', () => { if (!state.pinned) showTooltip(model, hit, price); });
       hit.addEventListener('pointerleave', () => { if (!state.pinned && document.activeElement !== hit) tooltip.hidden = true; });
       hit.addEventListener('focus', () => { if (!state.pinned) showTooltip(model, hit, price); });
@@ -1002,11 +1024,38 @@
       const toggle = () => { state.pinned = state.pinned === model.id ? null : model.id; if (state.pinned) showTooltip(model, hit, price); else tooltip.hidden = true; };
       hit.addEventListener('click', event => { event.stopPropagation(); toggle(); });
       hit.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } });
-      hits.append(hit);
+      (hit.tagName === 'circle' ? pointHits : stripeHits).append(hit);
+    };
+    for (const model of unknownIntelligence.filter(model => knownMetric(model, 'time'))) {
+      const x = xScale(model.time);
+      bubbles.append(svgEl('line', { x1: x, x2: x, y1: plot.top, y2: plot.bottom, stroke: model.color, 'stroke-width': 3, 'stroke-opacity': .35, 'stroke-dasharray': '4 3', 'data-aa3d-missing-intelligence': model.id, 'pointer-events': 'none' }));
+      if (!knownMetric(model, 'cost')) bubbles.append(svgEl('path', { d: `M ${x - 5} ${plot.bottom - 10} l 10 10 M ${x - 5} ${plot.bottom} l 10 -10`, stroke: model.color, 'stroke-width': 2, 'data-aa3d-missing-cost': model.id }));
+      bindHit(model, svgEl('rect', { x: x - 6, y: plot.top, width: 12, height: plot.bottom - plot.top }), knownMetric(model, 'cost') ? chartPrice(model.cost) : 'Unknown');
+    }
+    [...models].sort((a, b) => (knownMetric(b, 'cost') ? b.cost : -1) - (knownMetric(a, 'cost') ? a.cost : -1)).forEach(model => {
+      const item = byId.get(model.id) || { cx: plot.right + 6, cy: yScale(model.intelligence), r: 6, missingTime: true, missingCost: !knownMetric(model, 'cost'), priceInside: false };
+      const { cx, cy, r } = item;
+      if (item.missingTime) bubbles.append(svgEl('line', { x1: plot.left, x2: plot.right, y1: cy, y2: cy, stroke: model.color, 'stroke-width': 4, 'stroke-opacity': .22, 'data-aa3d-missing-time': model.id, 'pointer-events': 'none' }));
+      if (item.missingCost) bubbles.append(svgEl('path', { d: `M ${cx - 5} ${cy - 5} L ${cx + 5} ${cy + 5} M ${cx - 5} ${cy + 5} L ${cx + 5} ${cy - 5}`, fill: 'none', stroke: model.color, 'stroke-width': 2, 'data-aa3d-missing-cost': model.id, 'pointer-events': 'none' }));
+      if (!item.missingTime && !item.missingCost) {
+        const gradientId = `aa3d-circle-gradient-${bubbles.childElementCount}`;
+        const gradient = svgEl('linearGradient', { id: gradientId, gradientUnits: 'userSpaceOnUse', x1: 0, y1: cy - r, x2: 0, y2: cy + r });
+        gradient.append(svgEl('stop', { offset: 0, 'stop-color': model.color, 'stop-opacity': .16 }), svgEl('stop', { offset: 1, 'stop-color': model.color, 'stop-opacity': .30 }));
+        bubbles.append(gradient);
+        const circle = svgEl('circle', { cx, cy, r, fill: `url(#${gradientId})`, stroke: model.pareto3 ? '#7837aa' : model.color, 'stroke-opacity': model.pareto3 ? .9 : .45, 'stroke-width': model.pareto3 ? 2 : 1, 'data-aa3d-id': model.id, style: 'cursor:pointer' });
+        circle.setAttribute('pointer-events', 'none');
+        bubbles.append(circle);
+      }
+      const price = item.missingCost ? 'Unknown' : chartPrice(model.cost);
+      if (item.priceInside) {
+        const text = svgEl('text', { x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': item.fontSize, 'font-weight': 600, fill: '#171717', stroke: '#fff', 'stroke-width': 1.5, 'paint-order': 'stroke', 'pointer-events': 'none', 'aria-hidden': 'true', 'data-aa3d-price-id': model.id });
+        text.textContent = price; prices.append(text);
+      }
+      bindHit(model, item.missingTime ? svgEl('rect', { x: plot.left, y: cy - 6, width: plot.right - plot.left + 14, height: 12 }) : svgEl('circle', { cx, cy, r: Math.max(12, r) }), price);
     });
     renderCallouts(layout.items, labels, leaders);
-    svg.onclick = event => { if (!event.target.closest('circle[data-aa3d-hit-id]')) { state.pinned = null; tooltip.hidden = true; } };
-    status.textContent = `${models.length} of ${total} models shown · ${sourceInfo}`;
+    svg.onclick = event => { if (!event.target.closest('[data-aa3d-hit-id]')) { state.pinned = null; tooltip.hidden = true; } };
+    status.textContent = `${models.length + unknownIntelligence.length} of ${total} models shown · ${sourceInfo}`;
     chart.updatePan?.();
   }
 
@@ -1019,9 +1068,9 @@
     const metricGrid = other => {
       const grid = document.createElement('div'); grid.className = 'aa3d-metric-grid';
       for (const [key, label, value, higher] of [
-        ['intelligence', 'Intelligence', other.intelligence.toFixed(2), true],
-        ['time', 'Time / task', `${other.time.toFixed(2)} min`, false],
-        ['cost', 'Cost / task', other.id === model.id ? price : detailPrice(other.cost), false],
+        ['intelligence', 'Intelligence', knownMetric(other, 'intelligence') ? other.intelligence.toFixed(2) : 'Unknown', true],
+        ['time', 'Time / task', knownMetric(other, 'time') ? `${other.time.toFixed(2)} min` : 'Unknown', false],
+        ['cost', 'Cost / task', knownMetric(other, 'cost') ? (other.id === model.id ? price : detailPrice(other.cost)) : 'Unknown', false],
       ]) {
         const cell = document.createElement('div');
         const caption = document.createElement('span'); caption.className = 'aa3d-metric-caption'; caption.textContent = label;
@@ -1044,7 +1093,7 @@
     };
     tooltip.append(title, provider, metricGrid(model));
     const pareto = document.createElement('div'); pareto.className = 'aa3d-metric-caption';
-    pareto.textContent = `2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
+    pareto.textContent = missingMetrics(model).length ? 'Pareto: not evaluated (missing data)' : `2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
     pareto.style.marginTop = '5px'; tooltip.append(pareto);
     const section = document.createElement('div'); section.className = 'aa3d-better';
     const incomplete = missingMetrics(model).length > 0;
@@ -1081,6 +1130,29 @@
     tooltip.style.left = `${Math.max(plotElement.scrollLeft + 4, Math.min(left, plotElement.scrollLeft + plotElement.clientWidth - tooltip.offsetWidth - 4))}px`;
     tooltip.style.top = `${Math.max(0, circleBox.top - chartBox.top - tooltip.offsetHeight - 8)}px`;
     tooltip.onclick = event => event.stopPropagation();
+  }
+
+  function renderUnknownIntelligence(models) {
+    const section = chart.querySelector('.aa3d-unknown');
+    section.hidden = models.length === 0; section.replaceChildren();
+    if (!models.length) return;
+    const heading = document.createElement('h4'); heading.textContent = `Unknown intelligence (${models.length})`;
+    const note = document.createElement('p'); note.textContent = 'Vertical lines show an unknown intelligence value. Models with no known time are shown outside the numeric axes.';
+    const list = document.createElement('div'); list.className = 'aa3d-unknown-list';
+    for (const model of models) {
+      const card = document.createElement('div'); card.className = 'aa3d-unknown-card';
+      const marker = svgEl('svg', { viewBox: '0 0 28 54', 'aria-hidden': 'true' });
+      marker.append(svgEl('line', { x1: 14, x2: 14, y1: 2, y2: 52, stroke: model.color, 'stroke-width': 3, 'stroke-dasharray': '4 3', 'data-aa3d-missing-intelligence': model.id }));
+      if (!knownMetric(model, 'time')) marker.append(svgEl('line', { x1: 2, x2: 26, y1: 27, y2: 27, stroke: model.color, 'stroke-width': 3, 'stroke-opacity': .35, 'data-aa3d-missing-time': model.id }));
+      if (!knownMetric(model, 'cost')) marker.append(svgEl('path', { d: 'M 9 22 L 19 32 M 9 32 L 19 22', stroke: model.color, 'stroke-width': 2, 'data-aa3d-missing-cost': model.id }));
+      const body = document.createElement('div');
+      const name = document.createElement('strong'); name.textContent = model.name;
+      const provider = document.createElement('div'); provider.className = 'aa3d-metric-caption'; provider.textContent = model.provider;
+      const values = document.createElement('div'); values.className = 'aa3d-metric-caption';
+      values.textContent = `Time: ${knownMetric(model, 'time') ? model.time.toFixed(2) + ' min' : 'unknown'} · Cost: ${knownMetric(model, 'cost') ? detailPrice(model.cost) : 'unknown'}`;
+      body.append(name, provider, values); card.append(marker, body); list.append(card);
+    }
+    section.append(heading, note, list);
   }
 
   function updateExplanations(allModels, missing, hidden) {
@@ -1125,7 +1197,7 @@
     const missing = rawModels.map(model => ({ model, metrics: missingMetrics(model) })).filter(item => item.metrics.length);
     const all = rawModels.filter(model => !missingMetrics(model).length);
     comparisonModels = all;
-    syncSliders(all);
+    syncSliders(state.showMissing ? rawModels : all);
     const bound = key => state.filters[key] === '' || state.filters[key] == null ? null : Number(state.filters[key]);
     const { matches, error } = getSearchMatcher();
     const searchInput = chart.querySelector('[data-control="search"]');
@@ -1133,30 +1205,36 @@
     searchInput.setAttribute('aria-invalid', String(!!error));
     searchError.textContent = error;
     searchError.hidden = !error;
-    let models = all.filter(model => {
+    let models = (state.showMissing ? rawModels : all).filter(model => {
       if (!matches(model)) return false;
       for (const { metric, key, direction } of filterMetrics) {
         const limit = bound(key);
+        if (!knownMetric(model, metric)) continue;
         if (model[metric] < 0 || (limit !== null && (direction === 'min' ? model[metric] < limit : model[metric] > limit))) return false;
       }
       return true;
     });
-    const hidden = state.hideDominated ? models.map(model => ({ model, by: models.find(other => dominates(model, other, state.dominanceTolerance / 100)) })).filter(item => item.by) : [];
+    const complete = models.filter(model => !missingMetrics(model).length);
+    const hidden = state.hideDominated ? complete.map(model => ({ model, by: complete.find(other => dominates(model, other, state.dominanceTolerance / 100)) })).filter(item => item.by) : [];
     if (state.hideDominated) {
       const hiddenIds = new Set(hidden.map(item => item.model.id));
       models = models.filter(model => !hiddenIds.has(model.id));
     }
     syncNativeModelSelection(data, models);
-    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.compactVertical, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
+    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.showMissing, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
-    updateExplanations(all, missing, hidden);
-    if (!models.length) { svg.replaceChildren(); resizePlot(0); status.textContent = all.length ? 'No models match the current filters.' : 'No selected models have all three metrics yet.'; chart.updatePan?.(); return; }
+    updateExplanations(state.showMissing ? rawModels : all, missing, hidden);
+    chart.querySelector('.aa3d-missing-key').hidden = !state.showMissing;
+    const unknownIntelligence = models.filter(model => !knownMetric(model, 'intelligence'));
+    renderUnknownIntelligence(unknownIntelligence);
+    models = models.filter(model => knownMetric(model, 'intelligence'));
+    if (!models.length) { svg.replaceChildren(); resizePlot(0); status.textContent = unknownIntelligence.length ? `${unknownIntelligence.length} models shown with unknown intelligence.` : all.length ? 'No models match the current filters.' : 'No selected models have all three metrics yet.'; chart.updatePan?.(); return; }
     try {
       const nativeFilter = hasNativeModelFilter();
       const total = state.nativeBaseIds ? state.nativeBaseIds.length : data.models.length;
       const source = nativeFilter ? 'AA model selection' : data.visible ? 'current native chart' : 'current selection';
-      renderChart(models, total, `${source} · ${all.length} with all three metrics`);
+      renderChart(models, total, `${source} · ${all.length} with all three metrics`, unknownIntelligence);
     }
     catch (error) { status.textContent = 'Chart data is temporarily unavailable.'; console.warn(PREFIX, error); }
   }
