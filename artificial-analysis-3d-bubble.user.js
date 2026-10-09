@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.6.1
+// @version      2.6.2
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -160,6 +160,7 @@
       id: model.id,
       name: model.shortName || model.name || model.slug || 'Unknown model',
       provider: model.creator?.name || 'Unknown provider',
+      releaseDate: model.releaseDate,
       color: colorById.get(model.id) || colorByProvider.get(model.creator?.name) || model.creator?.color || '#64748b',
       intelligence: model.intelligenceIndex,
       time: finite(model.intelligenceIndexTimePerTask) ? model.intelligenceIndexTimePerTask / 60 : NaN,
@@ -1098,6 +1099,15 @@
     title.style.cssText = 'display:block;font-size:13px;line-height:1.3';
     const provider = document.createElement('div'); provider.textContent = model.provider;
     provider.style.cssText = 'color:#777;font-size:11px;margin:2px 0 6px';
+    const release = document.createElement('div'); release.className = 'aa3d-metric-caption';
+    release.style.margin = '-2px 0 8px';
+    release.append('Release date: ');
+    const date = typeof model.releaseDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(model.releaseDate) ? new Date(`${model.releaseDate}T00:00:00Z`) : null;
+    if (date && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === model.releaseDate) {
+      const time = document.createElement('time'); time.dateTime = model.releaseDate;
+      time.textContent = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+      release.append(time);
+    } else release.append('Unknown');
     const metricGrid = other => {
       const grid = document.createElement('div'); grid.className = 'aa3d-metric-grid';
       for (const [key, label, value, higher] of [
@@ -1124,7 +1134,7 @@
       }
       return grid;
     };
-    tooltip.append(title, provider, metricGrid(model));
+    tooltip.append(title, provider, release, metricGrid(model));
     const pareto = document.createElement('div'); pareto.className = 'aa3d-metric-caption';
     pareto.textContent = missingMetrics(model).length ? 'Pareto: not evaluated (missing data)' : `2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
     pareto.style.marginTop = '5px'; tooltip.append(pareto);
@@ -1255,7 +1265,7 @@
       models = models.filter(model => !hiddenIds.has(model.id));
     }
     syncNativeModelSelection(data, models);
-    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.showMissing, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
+    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.releaseDate, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.showMissing, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
     updateExplanations(state.showMissing ? rawModels : all, missing, hidden);
