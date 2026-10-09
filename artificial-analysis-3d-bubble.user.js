@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.5.24
+// @version      2.5.25
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -54,6 +54,7 @@
   let svg = null;
   let tooltip = null;
   let status = null;
+  let comparisonModels = [];
   const labelPositions = new Map();
   let lastLayout = null;
   let heightFrame = 0;
@@ -367,7 +368,7 @@
         #${ID} .aa3d-clear{height:30px;padding:0 .6rem;border:1px solid #ddd;border-radius:5px;background:#f8f8f8;color:#333;cursor:pointer}
         #${ID} input[type=checkbox]{accent-color:#6d36a3}#${ID} .aa3d-status{min-height:1.2em;color:#666;font-size:11px}
         #${ID} .aa3d-plot{position:relative;width:100%;overflow-x:auto;overflow-y:hidden;transition:height 320ms ease} @media(prefers-reduced-motion:reduce){#${ID} .aa3d-plot{transition:none}}#${ID} svg{display:block;width:100%;height:auto}
-        #${ID} .aa3d-tip{position:absolute;z-index:5;max-width:270px;padding:.55rem .7rem;border:1px solid #d4d4d4;border-radius:5px;background:#fff;box-shadow:0 3px 12px #0002;pointer-events:none;white-space:pre-line;line-height:1.5}
+        #${ID} .aa3d-tip{position:absolute;z-index:5;max-width:270px;padding:.55rem .7rem;border:1px solid #d4d4d4;border-radius:5px;background:#fff;box-shadow:0 3px 12px #0002;pointer-events:auto;white-space:pre-line;line-height:1.5}
         #${ID} .aa3d-hit{fill:transparent;stroke:transparent;cursor:pointer}#${ID} .aa3d-hit:focus{fill:none;stroke:#111;stroke-width:2;outline:none}#${ID} details.aa3d-missing,#${ID} details.aa3d-hidden-models{margin:.25rem 0;font-size:11px;color:#555}#${ID} details ul{max-height:160px;overflow:auto;margin:.3rem 0;padding-left:1.4rem}#${ID} .aa3d-mobile-nav{display:none;align-items:center;gap:.4rem;margin:.5rem 0;color:#555;font-size:11px}#${ID} .aa3d-mobile-nav button{min-width:30px;min-height:30px;border:1px solid #ddd;border-radius:4px;background:#fff}#${ID} .aa3d-mobile-nav button:first-of-type{margin-left:auto}
         @media(max-width:900px){#${ID} .aa3d-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:620px){#${ID}{padding:.65rem}#${ID} .aa3d-head{flex-wrap:wrap}#${ID} .aa3d-picker-wrap,#${ID} .aa3d-model-picker{width:100%;max-width:none}#${ID} .aa3d-search-wrap{min-width:100%;max-width:none;margin-left:0}#${ID} .aa3d-filters{grid-template-columns:1fr}#${ID} .aa3d-mobile-nav{display:flex}}
@@ -1004,6 +1005,30 @@
 
   function showTooltip(model, circle, price) {
     tooltip.textContent = `${model.name}\n${model.provider}\nIntelligence Index: ${model.intelligence.toFixed(2)}\nTime per Task: ${model.time.toFixed(2)} min\nCost per Task: ${price}\n2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
+    const section = document.createElement('div');
+    section.style.cssText = 'margin-top:.5rem;padding-top:.4rem;border-top:1px solid #ddd;white-space:normal';
+    const heading = document.createElement('strong'); heading.textContent = 'Better models';
+    const note = document.createElement('div'); note.textContent = `Within the AA model selection · Tolerance: ${state.dominanceTolerance}%`;
+    note.style.cssText = 'font-size:10px;color:#666';
+    section.append(heading, note);
+    if (missingMetrics(model).length) {
+      const message = document.createElement('div'); message.textContent = 'Cannot compare: this model has missing data.'; section.append(message);
+    } else {
+      const better = comparisonModels.filter(other => dominates(model, other, state.dominanceTolerance / 100))
+        .sort((a, b) => b.intelligence - a.intelligence || a.cost - b.cost || a.time - b.time);
+      if (!better.length) {
+        const message = document.createElement('div'); message.textContent = 'No better model at this tolerance.'; section.append(message);
+      } else {
+        const list = document.createElement('ul'); list.style.cssText = 'margin:.3rem 0 0;padding-left:1rem;max-height:200px;overflow:auto';
+        better.forEach(other => {
+          const row = document.createElement('li');
+          const name = document.createElement('strong'); name.textContent = other.name;
+          const values = document.createElement('div'); values.textContent = `Intelligence: ${other.intelligence.toFixed(2)} · Time: ${other.time.toFixed(2)} min · Cost: ${detailPrice(other.cost)}`;
+          row.append(name, values); list.append(row);
+        }); section.append(list);
+      }
+    }
+    tooltip.append(section);
     tooltip.hidden = false;
     const plotElement = chart.querySelector('.aa3d-plot');
     const chartBox = plotElement.getBoundingClientRect();
@@ -1054,6 +1079,7 @@
     const rawModels = modelMetrics(data.models, data.colorById, data.colorByProvider);
     const missing = rawModels.map(model => ({ model, metrics: missingMetrics(model) })).filter(item => item.metrics.length);
     const all = rawModels.filter(model => !missingMetrics(model).length);
+    comparisonModels = all;
     syncSliders(all);
     const bound = key => state.filters[key] === '' || state.filters[key] == null ? null : Number(state.filters[key]);
     const { matches, error } = getSearchMatcher();
