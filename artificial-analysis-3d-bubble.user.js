@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.6.5
+// @version      2.6.6
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -370,11 +370,11 @@
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label><button type="button" class="aa3d-help-button" data-help="tolerance" aria-label="Explain tolerance" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
-          <label title="Show missing time as a horizontal stripe, missing intelligence as a vertical line, and missing cost as an X. If time is unknown, the X is inside the model label. These models are not part of Pareto comparisons."><input type="checkbox" data-control="showMissing"> Show models with missing data</label>
+          <label title="Show missing time as a horizontal stripe, missing intelligence as a vertical line, and missing cost as an X. If time is unknown, the X is inside the model label. Models with none of these three values are excluded. These models are not part of Pareto comparisons."><input type="checkbox" data-control="showMissing"> Show models with missing data</label>
           <label title="Reduce vertical space without overlapping model labels. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
-        <p class="aa3d-missing-key" hidden>Missing data: horizontal stripe = time unknown · vertical line = intelligence unknown · X = cost unknown. If time is unknown, the X is inside the model label. Stripe labels do not show task time. Select a stripe or X for details. Filter by model or provider to see individual labels for crowded stripes. Filters use known values only. These models are not part of Pareto comparisons.</p>
+        <p class="aa3d-missing-key" hidden>Missing data: horizontal stripe = time unknown · vertical line = intelligence unknown · X = cost unknown. If time is unknown, the X is inside the model label. Models with none of these three values are excluded. Stripe labels do not show task time. Select a stripe or X for details. Filter by model or provider to see individual labels for crowded stripes. Filters use known values only. These models are not part of Pareto comparisons.</p>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
         <p class="aa3d-search-error" id="aa3d-search-error" role="alert" hidden></p>
         <p class="aa3d-filter-note">Search and filters also update AA's other charts. Clear filters to restore your AA model selection.</p>
@@ -1276,7 +1276,8 @@
     if (!data) { status.textContent = 'Waiting for Artificial Analysis model data…'; return; }
     if (initializeModelSelection(data)) { status.textContent = 'Selecting all AA models…'; return; }
     updateModelPicker(data);
-    const rawModels = modelMetrics(data.models, data.colorById, data.colorByProvider);
+    const rawModels = modelMetrics(data.models, data.colorById, data.colorByProvider)
+      .filter(model => ['intelligence', 'time', 'cost'].some(key => knownMetric(model, key)));
     const missing = rawModels.map(model => ({ model, metrics: missingMetrics(model) })).filter(item => item.metrics.length);
     const all = rawModels.filter(model => !missingMetrics(model).length);
     comparisonModels = all;
