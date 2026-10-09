@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.6.0
+// @version      2.6.1
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -54,11 +54,37 @@
   let chart = null;
   let svg = null;
   let tooltip = null;
+  let tooltipTarget = null;
+  let tooltipHideTimer = 0;
   let status = null;
   let comparisonModels = [];
   const labelPositions = new Map();
   let lastLayout = null;
   let heightFrame = 0;
+
+  function cancelTooltipHide() {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = 0;
+  }
+
+  function hideTooltip() {
+    cancelTooltipHide();
+    if (tooltip) tooltip.hidden = true;
+    tooltipTarget = null;
+  }
+
+  function scheduleTooltipHide(event) {
+    cancelTooltipHide();
+    const next = event?.relatedTarget;
+    if (next instanceof Node && (tooltip?.contains(next) || tooltipTarget?.contains(next))) return;
+    // Keep the popup open while the pointer crosses the gap from the marker.
+    tooltipHideTimer = setTimeout(() => {
+      tooltipHideTimer = 0;
+      if (state.pinned || tooltip?.matches(':hover') || tooltipTarget?.matches(':hover') ||
+          tooltip?.contains(document.activeElement) || document.activeElement === tooltipTarget) return;
+      hideTooltip();
+    }, 350);
+  }
 
   const log = (...args) => console.info(PREFIX, ...args);
   const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -515,11 +541,16 @@
         saveSettings();
         scheduleRefresh(true);
       });
-      chart.addEventListener('pointerleave', () => { if (!state.pinned && tooltip) tooltip.hidden = true; });
+      chart.addEventListener('pointerleave', scheduleTooltipHide);
+      const tip = chart.querySelector('.aa3d-tip');
+      tip.addEventListener('pointerenter', cancelTooltipHide);
+      tip.addEventListener('pointerleave', scheduleTooltipHide);
+      tip.addEventListener('focusin', cancelTooltipHide);
+      tip.addEventListener('focusout', scheduleTooltipHide);
       chart.addEventListener('keydown', event => {
         if (event.key !== 'Escape') return;
         state.pinned = null;
-        tooltip.hidden = true;
+        hideTooltip();
         const help = chart.querySelector('.aa3d-help');
         help.hidden = true;
         chart.querySelectorAll('[data-help]').forEach(button => button.setAttribute('aria-expanded', 'false'));
@@ -956,7 +987,7 @@
 
   function renderChart(models, total, sourceInfo, unknownIntelligence = []) {
     const complete = models.filter(model => !missingMetrics(model).length);
-    tooltip.hidden = true;
+    hideTooltip();
     const plotElement = chart.querySelector('.aa3d-plot');
     const width = Math.max(900, Math.round(plotElement.clientWidth));
     const pricedModels = [...models, ...unknownIntelligence].filter(model => knownMetric(model, 'cost'));
@@ -1018,10 +1049,10 @@
       hit.setAttribute('tabindex', '0'); hit.setAttribute('role', 'button'); hit.setAttribute('aria-describedby', 'aa3d-tooltip');
       hit.setAttribute('aria-label', `${model.name}: Intelligence ${knownMetric(model, 'intelligence') ? model.intelligence.toFixed(2) : 'unknown'}, time ${knownMetric(model, 'time') ? model.time.toFixed(2) + ' minutes' : 'unknown'}, cost ${price}`);
       hit.addEventListener('pointerenter', () => { if (!state.pinned) showTooltip(model, hit, price); });
-      hit.addEventListener('pointerleave', () => { if (!state.pinned && document.activeElement !== hit) tooltip.hidden = true; });
+      hit.addEventListener('pointerleave', scheduleTooltipHide);
       hit.addEventListener('focus', () => { if (!state.pinned) showTooltip(model, hit, price); });
-      hit.addEventListener('blur', () => { if (!state.pinned) tooltip.hidden = true; });
-      const toggle = () => { state.pinned = state.pinned === model.id ? null : model.id; if (state.pinned) showTooltip(model, hit, price); else tooltip.hidden = true; };
+      hit.addEventListener('blur', scheduleTooltipHide);
+      const toggle = () => { state.pinned = state.pinned === model.id ? null : model.id; if (state.pinned) showTooltip(model, hit, price); else hideTooltip(); };
       hit.addEventListener('click', event => { event.stopPropagation(); toggle(); });
       hit.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } });
       (hit.tagName === 'circle' ? pointHits : stripeHits).append(hit);
@@ -1054,12 +1085,14 @@
       bindHit(model, item.missingTime ? svgEl('rect', { x: plot.left, y: cy - 6, width: plot.right - plot.left + 14, height: 12 }) : svgEl('circle', { cx, cy, r: Math.max(12, r) }), price);
     });
     renderCallouts(layout.items, labels, leaders);
-    svg.onclick = event => { if (!event.target.closest('[data-aa3d-hit-id]')) { state.pinned = null; tooltip.hidden = true; } };
+    svg.onclick = event => { if (!event.target.closest('[data-aa3d-hit-id]')) { state.pinned = null; hideTooltip(); } };
     status.textContent = `${models.length + unknownIntelligence.length} of ${total} models shown · ${sourceInfo}`;
     chart.updatePan?.();
   }
 
   function showTooltip(model, circle, price) {
+    cancelTooltipHide();
+    tooltipTarget = circle;
     tooltip.replaceChildren();
     const title = document.createElement('strong'); title.textContent = model.name;
     title.style.cssText = 'display:block;font-size:13px;line-height:1.3';
@@ -1108,6 +1141,7 @@
       message.style.marginTop = '8px'; section.append(message);
     } else {
       const list = document.createElement('div'); list.className = 'aa3d-better-list';
+      list.tabIndex = 0; list.setAttribute('role', 'region'); list.setAttribute('aria-label', 'Better models');
       better.forEach(other => {
         const card = document.createElement('div'); card.className = 'aa3d-better-card';
         const name = document.createElement('strong'); name.style.cssText = 'display:block;font-size:12px;line-height:1.3;margin-bottom:6px';
