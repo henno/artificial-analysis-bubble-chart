@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.6.3
+// @version      2.6.4
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -1173,18 +1173,15 @@
     const pareto = document.createElement('div'); pareto.className = 'aa3d-metric-caption';
     pareto.textContent = missingMetrics(model).length ? 'Pareto: not evaluated (missing data)' : `2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
     pareto.style.marginTop = '5px'; tooltip.append(pareto);
-    const section = document.createElement('div'); section.className = 'aa3d-better';
     const incomplete = missingMetrics(model).length > 0;
     const better = incomplete ? [] : comparisonModels.filter(other => dominates(model, other, state.dominanceTolerance / 100))
       .sort((a, b) => b.intelligence - a.intelligence || a.cost - b.cost || a.time - b.time);
-    const heading = document.createElement('strong'); heading.textContent = `Better models${better.length ? ` (${better.length})` : ''}`;
-    const note = document.createElement('div'); note.className = 'aa3d-metric-caption';
-    note.textContent = `AA selection · Tolerance ${state.dominanceTolerance}% · Compared with this model`;
-    section.append(heading, note);
-    if (!better.length) {
-      const message = document.createElement('div'); message.textContent = incomplete ? 'Cannot compare: this model has missing data.' : 'No better model at this tolerance.';
-      message.style.marginTop = '8px'; section.append(message);
-    } else {
+    if (better.length) {
+      const section = document.createElement('div'); section.className = 'aa3d-better';
+      const heading = document.createElement('strong'); heading.textContent = `Better models (${better.length})`;
+      const note = document.createElement('div'); note.className = 'aa3d-metric-caption';
+      note.textContent = `AA selection · Tolerance ${state.dominanceTolerance}% · Compared with this model`;
+      section.append(heading, note);
       const list = document.createElement('div'); list.className = 'aa3d-better-list';
       list.tabIndex = 0; list.setAttribute('role', 'region'); list.setAttribute('aria-label', 'Better models');
       better.forEach(other => {
@@ -1199,8 +1196,8 @@
         }
         card.append(metricGrid(other)); list.append(card);
       }); section.append(list);
+      tooltip.append(section);
     }
-    tooltip.append(section);
     tooltip.hidden = false;
     const plotElement = chart.querySelector('.aa3d-plot');
     const chartBox = plotElement.getBoundingClientRect();
