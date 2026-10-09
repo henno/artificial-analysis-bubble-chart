@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.6.2
+// @version      2.6.3
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -20,11 +20,13 @@
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 4;
   const NS = 'http://www.w3.org/2000/svg';
+  const DAY_MS = 86400000;
   const state = { showMissing: false, compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
   const filterMetrics = [
     { metric: 'intelligence', key: 'intelligenceMin', direction: 'min', step: 0.1, digits: 1 },
     { metric: 'time', key: 'timeMax', step: 0.1, digits: 1 },
     { metric: 'cost', key: 'costMax', step: 0.01, digits: 2 },
+    { metric: 'releaseDay', key: 'releaseDateMin', direction: 'min', step: 1, digits: 0, type: 'date' },
   ];
   function restoreSettings() {
     try {
@@ -88,6 +90,17 @@
 
   const log = (...args) => console.info(PREFIX, ...args);
   const finite = value => typeof value === 'number' && Number.isFinite(value);
+  function releaseDay(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return NaN;
+    const date = new Date(`${value}T00:00:00Z`);
+    return finite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date.getTime() / DAY_MS : NaN;
+  }
+  function releaseDateValue(day) {
+    return finite(day) ? new Date(day * DAY_MS).toISOString().slice(0, 10) : '';
+  }
+  function releaseDateLabel(day) {
+    return new Date(day * DAY_MS).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  }
   function detailPrice(cost) {
     if (cost === 0) return '$0';
     for (let digits = 3; digits <= 20; digits++) {
@@ -161,6 +174,7 @@
       name: model.shortName || model.name || model.slug || 'Unknown model',
       provider: model.creator?.name || 'Unknown provider',
       releaseDate: model.releaseDate,
+      releaseDay: releaseDay(model.releaseDate),
       color: colorById.get(model.id) || colorByProvider.get(model.creator?.name) || model.creator?.color || '#64748b',
       intelligence: model.intelligenceIndex,
       time: finite(model.intelligenceIndexTimePerTask) ? model.intelligenceIndexTimePerTask / 60 : NaN,
@@ -368,6 +382,7 @@
           <div class="aa3d-range"><label for="aa3d-intelligence">Minimum Intelligence Index</label><input id="aa3d-intelligence" type="number" min="0" data-number="intelligenceMin" aria-label="Minimum Intelligence Index"><input type="range" min="0" data-filter="intelligenceMin" aria-label="Minimum Intelligence Index slider"></div>
           <div class="aa3d-range"><label for="aa3d-time">Maximum Time per Task (min)</label><input id="aa3d-time" type="number" min="0" data-number="timeMax" aria-label="Maximum Time per Task in minutes"><input type="range" min="0" data-filter="timeMax" aria-label="Maximum Time per Task slider"></div>
           <div class="aa3d-range"><label for="aa3d-cost">Maximum Cost per Task ($)</label><input id="aa3d-cost" type="number" min="0" data-number="costMax" aria-label="Maximum Cost per Task in dollars"><input type="range" min="0" data-filter="costMax" aria-label="Maximum Cost per Task slider"></div>
+          <div class="aa3d-range" title="Show models released on or after this date. Dates come from Artificial Analysis."><label for="aa3d-release-date">Released on or after</label><input id="aa3d-release-date" type="date" data-number="releaseDateMin" aria-label="Released on or after"><input type="range" data-filter="releaseDateMin" aria-label="Release date slider"></div>
           <button type="button" class="aa3d-clear">Clear filters</button>
         </div>
         <div class="aa3d-status" role="status"></div>
@@ -392,10 +407,11 @@
         #${ID} .aa3d-regex{flex:none;font-size:12px}#${ID} .aa3d-search-error{margin:.2rem 0;color:#b42318;font-size:11px}#${ID} input[type=search][aria-invalid=true]{border-color:#b42318}
         #${ID} .aa3d-dominance{gap:.35rem}#${ID} .aa3d-dominance output{min-width:2.5em;font-variant-numeric:tabular-nums}
         #${ID} .aa3d-dominance[data-disabled=true]{opacity:.5}#${ID} .aa3d-dominance input:disabled{cursor:not-allowed}
-        #${ID} .aa3d-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:end;gap:.75rem;margin:.65rem 0}
+        #${ID} .aa3d-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:end;gap:.75rem;margin:.65rem 0}
         #${ID} .aa3d-range{min-width:0;padding:.45rem .6rem;border:1px solid #eee;border-radius:5px}
         #${ID} .aa3d-range label{display:block;font-size:11px;font-weight:600;color:#555}
         #${ID} .aa3d-range input[type=number]{width:92px;max-width:100%;height:27px;margin-top:.3rem;padding:0 .4rem;border:1px solid #ccc;border-radius:4px;font:12px system-ui,sans-serif;color:#171717}
+        #${ID} .aa3d-range input[type=date]{width:150px;max-width:100%;height:27px;margin-top:.3rem;padding:0 .4rem;border:1px solid #ccc;border-radius:4px;font:12px system-ui,sans-serif;color:#171717;background:#fff}
         #${ID} .aa3d-range output{font-variant-numeric:tabular-nums;color:#171717}
         #${ID} input[type=range]{display:block;width:100%;margin:.35rem 0 0;accent-color:#6d36a3;cursor:pointer}
         #${ID} .aa3d-dominance input[type=range]{width:95px;margin:0}
@@ -505,25 +521,39 @@
       chart.querySelectorAll('input[data-filter]').forEach(input => input.addEventListener('input', () => {
         const key = input.dataset.filter;
         state.filters[key] = Number(input.value);
-        chart.querySelector(`[data-number="${key}"]`).value = input.value;
+        const field = chart.querySelector(`[data-number="${key}"]`);
+        field.value = field.type === 'date' ? releaseDateValue(state.filters[key]) : input.value;
         state.pinned = null;
         saveSettings();
         scheduleLiveRefresh();
       }));
       chart.querySelectorAll('input[data-number]').forEach(input => {
-        const applyNumber = () => {
+        const applyValue = () => {
           const key = input.dataset.number;
           const range = chart.querySelector(`[data-filter="${key}"]`);
-          if (input.value === '' || !Number.isFinite(Number(input.value))) return;
-          const value = Math.max(0, Math.min(Number(input.value), Number(range.max)));
+          if (input.type === 'date' && input.value === '') {
+            state.filters[key] = null;
+            range.value = range.min;
+            state.pinned = null;
+            saveSettings();
+            scheduleLiveRefresh();
+            return;
+          }
+          const entered = input.type === 'date' ? releaseDay(input.value) : Number(input.value);
+          if (input.value === '' || !finite(entered)) return;
+          const value = Math.max(Number(range.min), Math.min(entered, Number(range.max)));
           state.filters[key] = value;
           range.value = value;
           state.pinned = null;
           saveSettings();
           scheduleLiveRefresh();
         };
-        input.addEventListener('input', applyNumber);
-        input.addEventListener('change', () => { applyNumber(); input.value = chart.querySelector(`[data-filter="${input.dataset.number}"]`).value; });
+        input.addEventListener('input', applyValue);
+        input.addEventListener('change', () => {
+          applyValue();
+          const value = Number(chart.querySelector(`[data-filter="${input.dataset.number}"]`).value);
+          input.value = input.type === 'date' ? releaseDateValue(value) : String(value);
+        });
       });
       chart.querySelector('.aa3d-clear').addEventListener('click', () => {
         state.search = '';
@@ -579,19 +609,25 @@
     if (!models.length) return;
     for (const config of filterMetrics) {
       const values = models.filter(model => knownMetric(model, config.metric)).map(model => model[config.metric]);
+      const dateFilter = config.type === 'date';
+      const start = dateFilter && values.length ? Math.min(...values) : 0;
       const high = Number((Math.ceil(Math.max(0, ...values) / config.step) * config.step).toFixed(config.digits));
       const end = Math.max(config.step, high);
       const input = chart.querySelector(`[data-filter="${config.key}"]`);
       const number = chart.querySelector(`[data-number="${config.key}"]`);
+      input.min = start;
       if (Number(input.max) !== end) input.max = end;
       if (Number(input.step) !== config.step) input.step = config.step;
-      number.max = end;
+      number.min = dateFilter ? releaseDateValue(start) : '0';
+      number.max = dateFilter ? releaseDateValue(end) : String(end);
       number.step = config.step;
-      const defaultValue = config.direction === 'min' ? 0 : end;
-      const selected = Math.max(0, Math.min(state.filters[config.key] ?? defaultValue, end));
+      number.disabled = input.disabled = dateFilter && !values.length;
+      const defaultValue = config.direction === 'min' ? start : end;
+      const selected = Math.max(start, Math.min(state.filters[config.key] ?? defaultValue, end));
       state.filters[config.key] = selected === defaultValue ? null : selected;
       if (Number(input.value) !== selected) input.value = selected;
-      if (document.activeElement !== number) number.value = selected.toFixed(config.digits);
+      if (dateFilter) input.setAttribute('aria-valuetext', values.length ? releaseDateLabel(selected) : 'No release dates available');
+      if (document.activeElement !== number) number.value = dateFilter ? (values.length ? releaseDateValue(selected) : '') : selected.toFixed(config.digits);
     }
   }
 
@@ -1102,10 +1138,9 @@
     const release = document.createElement('div'); release.className = 'aa3d-metric-caption';
     release.style.margin = '-2px 0 8px';
     release.append('Release date: ');
-    const date = typeof model.releaseDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(model.releaseDate) ? new Date(`${model.releaseDate}T00:00:00Z`) : null;
-    if (date && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === model.releaseDate) {
+    if (finite(model.releaseDay)) {
       const time = document.createElement('time'); time.dateTime = model.releaseDate;
-      time.textContent = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+      time.textContent = releaseDateLabel(model.releaseDay);
       release.append(time);
     } else release.append('Unknown');
     const metricGrid = other => {

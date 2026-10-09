@@ -18,7 +18,7 @@ Artificial Analysis lists more than 600 models. Showing many models at once make
 
 ## What you can do
 
-- Set a minimum Intelligence Index and maximum time and cost with sliders or number fields. The chart updates as you move a slider.
+- Set a minimum Intelligence Index, maximum time and cost, and earliest release date with sliders or fields. **Released on or after** keeps models released on the chosen date or later. The chart updates as you move a slider.
 - Search by model or provider. Turn on **Regex** to use a pattern such as `(Claude)|(GPT)`; matching ignores case. The chart shows an error if the pattern is invalid. The search, sliders, and dominance filter also update AA's other charts.
 - The most expensive visible model has the largest bubble. Other bubble diameters follow their cost as a share of that model's cost. A model at half the cost has a bubble half as wide. Very small bubbles keep a visible marker.
 - Read the price inside a bubble when it fits. Other prices appear below the model name in a shaded speech bubble. Model variants appear below the name. Each speech bubble points diagonally towards its model: upper right, upper left, lower right, or lower left. The chart grows or shrinks with an animation when labels need a different amount of space. It uses a taller plotting area to keep labels apart. The layout favours the previous direction after a filter change. Each price uses the fewest decimal places that distinguish it from other visible costs, with at least cents. Trailing zeros are removed, and free models show `$0`. Select any bubble to see its details.
