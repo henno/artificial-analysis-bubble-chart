@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.6.4
+// @version      2.6.5
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -370,11 +370,11 @@
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label><button type="button" class="aa3d-help-button" data-help="tolerance" aria-label="Explain tolerance" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
-          <label title="Show missing time as a horizontal stripe, missing intelligence as a vertical line, and missing cost as an X. These models are not part of Pareto comparisons."><input type="checkbox" data-control="showMissing"> Show models with missing data</label>
+          <label title="Show missing time as a horizontal stripe, missing intelligence as a vertical line, and missing cost as an X. If time is unknown, the X is inside the model label. These models are not part of Pareto comparisons."><input type="checkbox" data-control="showMissing"> Show models with missing data</label>
           <label title="Reduce vertical space without overlapping model labels. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
-        <p class="aa3d-missing-key" hidden>Missing data: horizontal stripe = time unknown · vertical line = intelligence unknown · X = cost unknown. Stripe labels do not show task time. Select a stripe or X for details. Filter by model or provider to see individual labels for crowded stripes. Filters use known values only. These models are not part of Pareto comparisons.</p>
+        <p class="aa3d-missing-key" hidden>Missing data: horizontal stripe = time unknown · vertical line = intelligence unknown · X = cost unknown. If time is unknown, the X is inside the model label. Stripe labels do not show task time. Select a stripe or X for details. Filter by model or provider to see individual labels for crowded stripes. Filters use known values only. These models are not part of Pareto comparisons.</p>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
         <p class="aa3d-search-error" id="aa3d-search-error" role="alert" hidden></p>
         <p class="aa3d-filter-note">Search and filters also update AA's other charts. Clear filters to restore your AA model selection.</p>
@@ -733,7 +733,7 @@
       .map((model, index) => [model.id, .05 + (index * .61803398875 % 1) * .9]));
     const prepared = models.map(model => {
       const missingTime = !knownMetric(model, 'time'), missingCost = !knownMetric(model, 'cost');
-      const price = missingCost ? 'Cost unknown' : chartPrice(model.cost), r = missingTime || missingCost ? 6 : radius(model.cost);
+      const price = missingCost ? `${missingTime ? '× ' : ''}Cost unknown` : chartPrice(model.cost), r = missingTime || missingCost ? 6 : radius(model.cost);
       // A stripe has no time position. Spread its label anchors across the stripe.
       const timeFraction = stripePositions.get(model.id);
       const fontSize = [11, 10, 9, 8].find(size => textWidth(price, `600 ${size}px system-ui`) + 4 <= 2 * r && size + 4 <= 2 * r) || 8;
@@ -1015,7 +1015,14 @@
           }
         }
         if (row.price && row.value) line.append(document.createTextNode(' · '));
-        if (row.price) { const price = svgEl('tspan', { 'data-aa3d-price-id': item.id, 'font-weight': 600, fill: '#171717' }); price.textContent = row.price; line.append(price); }
+        if (row.price) {
+          const price = svgEl('tspan', { 'data-aa3d-price-id': item.id, 'font-weight': 600, fill: '#171717' });
+          if (item.missingTime && item.missingCost) {
+            const mark = svgEl('tspan', { fill: item.color, 'data-aa3d-missing-cost': item.id }); mark.textContent = '×';
+            price.append(mark, document.createTextNode(' Cost unknown'));
+          } else price.textContent = row.price;
+          line.append(price);
+        }
         text.append(line);
       });
       group.append(text); layer.append(group);
@@ -1104,7 +1111,7 @@
       const item = byId.get(model.id) || { cx: plot.right + 6, cy: yScale(model.intelligence), r: 6, missingTime: true, missingCost: !knownMetric(model, 'cost'), priceInside: false };
       const { cx, cy, r } = item;
       if (item.missingTime) bubbles.append(svgEl('line', { x1: plot.left, x2: plot.right, y1: cy, y2: cy, stroke: model.color, 'stroke-width': 4, 'stroke-opacity': .22, 'data-aa3d-missing-time': model.id, 'pointer-events': 'none' }));
-      if (item.missingCost) bubbles.append(svgEl('path', { d: `M ${cx - 5} ${cy - 5} L ${cx + 5} ${cy + 5} M ${cx - 5} ${cy + 5} L ${cx + 5} ${cy - 5}`, fill: 'none', stroke: model.color, 'stroke-width': 2, 'data-aa3d-missing-cost': model.id, 'pointer-events': 'none' }));
+      if (item.missingCost && !item.missingTime) bubbles.append(svgEl('path', { d: `M ${cx - 5} ${cy - 5} L ${cx + 5} ${cy + 5} M ${cx - 5} ${cy + 5} L ${cx + 5} ${cy - 5}`, fill: 'none', stroke: model.color, 'stroke-width': 2, 'data-aa3d-missing-cost': model.id, 'pointer-events': 'none' }));
       if (!item.missingTime && !item.missingCost) {
         const gradientId = `aa3d-circle-gradient-${bubbles.childElementCount}`;
         const gradient = svgEl('linearGradient', { id: gradientId, gradientUnits: 'userSpaceOnUse', x1: 0, y1: cy - r, x2: 0, y2: cy + r });

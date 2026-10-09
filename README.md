@@ -26,7 +26,7 @@ Artificial Analysis lists more than 600 models. Showing many models at once make
 - See a dashed two-dimensional Pareto line and purple outlines for the exact three-dimensional Pareto set. Click the `?` buttons in the chart for explanations.
 - Open “Why models are hidden” to see which model and values caused each model to be hidden.
 - See which selected models have missing Intelligence Index, time, or cost data.
-- Turn on **Show models with missing data** to display them. A horizontal stripe means time is unknown, a vertical line means intelligence is unknown, and an X means cost is unknown. Stripe labels can move along the stripe; their horizontal position does not show task time. In crowded views, select a stripe for details or filter by model or provider to show individual stripe labels. Models with neither intelligence nor time are shown in a marked area outside the numeric axes.
+- Turn on **Show models with missing data** to display them. A horizontal stripe means time is unknown, a vertical line means intelligence is unknown, and an X means cost is unknown. If both time and cost are unknown, the X appears beside **Cost unknown** inside the speech bubble. Stripe labels can move along the stripe; their horizontal position does not show task time. In crowded views, select a stripe for details or filter by model or provider to show individual stripe labels. Models with neither intelligence nor time are shown in a marked area outside the numeric axes.
 - Select a bubble to see its values. Bubbles support touch, mouse, and keyboard. On a phone, swipe the chart or use its left and right buttons.
 
 Settings are saved in your browser and restored after a page reload. **Clear filters** restores the AA model selection you had before filtering.
