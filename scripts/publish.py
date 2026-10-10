@@ -29,7 +29,9 @@ def git(*args):
 
 
 def request(url, data=None, headers=None):
-    req = urllib.request.Request(url, data=data, headers=headers or {})
+    request_headers = {'User-Agent': 'AA-GreasyFork-Publisher/1.0'}
+    request_headers.update(headers or {})
+    req = urllib.request.Request(url, data=data, headers=request_headers)
     with urllib.request.urlopen(req, timeout=45) as response:
         return response.read()
 
