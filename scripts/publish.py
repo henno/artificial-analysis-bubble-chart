@@ -44,7 +44,19 @@ def version(code):
 
 
 def same_code(left, right):
-    return left.replace('\r\n', '\n').strip() == right.replace('\r\n', '\n').strip()
+    def normalize(code):
+        header = False
+        lines = []
+        for line in code.replace('\r\n', '\n').splitlines():
+            if line.strip() == '// ==UserScript==':
+                header = True
+            if header and re.match(r'^//\s*@(updateURL|downloadURL)\s+', line):
+                continue
+            lines.append(line)
+            if line.strip() == '// ==/UserScript==':
+                header = False
+        return '\n'.join(lines).strip()
+    return normalize(left) == normalize(right)
 
 
 def version_parts(value):

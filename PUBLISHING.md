@@ -17,7 +17,7 @@ You do not need to add a webhook to GitHub for this command. The command sends t
 2. Test the change on the real AA page. Commit it and push `main` to GitHub.
 3. Run `python3 scripts/publish.py`.
 
-The command checks syntax and runs the JavaScript tests. It requires a clean `main` branch and the same commit on GitHub. It sends the webhook once and checks that the Greasy Fork version and downloaded code match. If the version and code already match, it sends no webhook.
+The command checks syntax and runs the JavaScript tests. It requires a clean `main` branch and the same commit on GitHub. It sends the webhook once and checks that the Greasy Fork version and downloaded code match. The comparison excludes `@updateURL` and `@downloadURL` inside the metadata header because Greasy Fork replaces these URLs. It checks all other code and metadata. If the version and code already match, it sends no webhook.
 
 Use `python3 scripts/publish.py --check` to check without publication. Use `python3 -m unittest discover -s tests -p 'publish_test.py'` to check the publisher protocol without network requests.
 

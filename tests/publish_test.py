@@ -35,6 +35,13 @@ class PublishTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             publish.version_parts('2.7.3-beta')
 
+    def test_greasy_fork_replaces_only_update_metadata(self):
+        before = '// ==UserScript==\n// @updateURL https://github.com/source\n// @grant none\n// ==/UserScript==\nrun();'
+        after = '// ==UserScript==\n// @grant none\n// @updateURL https://update.greasyfork.org/file\n// ==/UserScript==\nrun();'
+        self.assertTrue(publish.same_code(before, after))
+        self.assertFalse(publish.same_code(before, after.replace('@grant none', '@grant GM_xmlhttpRequest')))
+        self.assertFalse(publish.same_code(before, after.replace('run();', 'other();')))
+
 
 if __name__ == '__main__':
     unittest.main()
