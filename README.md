@@ -41,5 +41,6 @@ The script does not send data to another server. Tampermonkey checks GitHub for 
 
 - [`artificial-analysis-3d-bubble.user.js`](artificial-analysis-3d-bubble.user.js) — installable userscript.
 - [`CHROME-INSTALLATION.md`](CHROME-INSTALLATION.md) — step-by-step Chrome guide.
+- [`PUBLISHING.md`](PUBLISHING.md) — Python publisher setup and release checks.
 
 Report problems on [GitHub Issues](https://github.com/henno/artificial-analysis-bubble-chart/issues).
