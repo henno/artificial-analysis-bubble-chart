@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.6.7
+// @version      2.7.0
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -19,9 +19,10 @@
   const ID = 'aa3d-bubble-chart';
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 4;
+  const DEFAULT_TOLERANCE_METRICS = { intelligence: true, time: true, cost: true };
   const NS = 'http://www.w3.org/2000/svg';
   const DAY_MS = 86400000;
-  const state = { showMissing: false, compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
+  const state = { showMissing: false, compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, toleranceMetrics: { ...DEFAULT_TOLERANCE_METRICS }, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
   const filterMetrics = [
     { metric: 'intelligence', key: 'intelligenceMin', direction: 'min', step: 0.1, digits: 1 },
     { metric: 'time', key: 'timeMax', step: 0.1, digits: 1 },
@@ -38,6 +39,9 @@
       // Existing users keep their AA model selection. New users select all models once.
       state.modelSelectionInitialized = typeof saved.modelSelectionInitialized === 'boolean' ? saved.modelSelectionInitialized : true;
       if (Number.isFinite(saved.dominanceTolerance)) state.dominanceTolerance = Math.max(0, Math.min(50, saved.dominanceTolerance));
+      for (const key of Object.keys(DEFAULT_TOLERANCE_METRICS)) {
+        if (typeof saved.toleranceMetrics?.[key] === 'boolean') state.toleranceMetrics[key] = saved.toleranceMetrics[key];
+      }
       if (typeof saved.search === 'string') state.search = saved.search.slice(0, 200);
       if (typeof saved.regex === 'boolean') state.regex = saved.regex;
       for (const { key } of filterMetrics) {
@@ -49,7 +53,7 @@
   function saveSettings() {
     const filters = Object.fromEntries(filterMetrics.filter(({ key }) => Number.isFinite(state.filters[key])).map(({ key }) => [key, state.filters[key]]));
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ showMissing: state.showMissing, compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ showMissing: state.showMissing, compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, toleranceMetrics: state.toleranceMetrics, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
     } catch (_) { /* Keep the current page usable if storage is unavailable. */ }
   }
   restoreSettings();
@@ -198,15 +202,27 @@
     return models.filter(a => !models.some(b => b.id !== a.id && b.time <= a.time && b.intelligence >= a.intelligence && (b.time < a.time || b.intelligence > a.intelligence)));
   }
 
-  function dominates(a, b, tolerance = 0) {
+  function dominates(a, b, tolerance = 0, toleranceMetrics = DEFAULT_TOLERANCE_METRICS) {
     if (b.id === a.id || missingMetrics(a).length || missingMetrics(b).length) return false;
     const exact = b.time <= a.time && b.cost <= a.cost && b.intelligence >= a.intelligence && (b.time < a.time || b.cost < a.cost || b.intelligence > a.intelligence);
     if (exact || !tolerance) return exact;
     const relative = (difference, baseline) => difference <= 0 ? 0 : baseline > 0 ? difference / baseline : Infinity;
-    const largestLoss = Math.max(relative(b.time - a.time, a.time), relative(b.cost - a.cost, a.cost), relative(a.intelligence - b.intelligence, a.intelligence));
+    const timeLoss = relative(b.time - a.time, a.time);
+    const costLoss = relative(b.cost - a.cost, a.cost);
+    const intelligenceLoss = relative(a.intelligence - b.intelligence, a.intelligence);
+    if ((timeLoss > 0 && !toleranceMetrics.time) || (costLoss > 0 && !toleranceMetrics.cost) ||
+        (intelligenceLoss > 0 && !toleranceMetrics.intelligence)) return false;
+    const largestLoss = Math.max(timeLoss, costLoss, intelligenceLoss);
     const largestGain = Math.max(relative(a.time - b.time, a.time), relative(a.cost - b.cost, a.cost), relative(b.intelligence - a.intelligence, a.intelligence));
     // Keep the improvement rule fixed while tolerance grows, so hidden models cannot reappear.
-    return largestLoss <= tolerance && largestGain > largestLoss;
+    // Do not let floating-point rounding change a percentage boundary or an equal trade-off.
+    return largestLoss <= tolerance + 1e-12 && largestGain > largestLoss + 1e-12;
+  }
+
+  function toleranceSummary() {
+    const metrics = Object.keys(DEFAULT_TOLERANCE_METRICS).filter(key => state.toleranceMetrics[key])
+      .map(key => key[0].toUpperCase() + key.slice(1));
+    return state.dominanceTolerance && metrics.length ? `${state.dominanceTolerance}% in ${metrics.join(', ')}` : '0% (exact comparison)';
   }
 
   function compute3DPareto(models, tolerance = 0) {
@@ -370,6 +386,7 @@
         <div class="aa3d-controls">
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideDominated" checked> Hide dominated models</label><button type="button" class="aa3d-help-button" data-help="dominance" aria-label="Explain hidden models" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-control-group"><label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label><button type="button" class="aa3d-help-button" data-help="tolerance" aria-label="Explain tolerance" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
+          <span class="aa3d-tolerance-metrics" role="group" aria-label="Metrics that may be worse within tolerance"><span>Allow drawbacks in:</span><label title="Allow lower intelligence within tolerance, if a larger improvement in time or cost outweighs it."><input type="checkbox" data-tolerance-metric="intelligence" aria-label="Allow lower intelligence within tolerance"> Intelligence</label><label title="Allow more task time within tolerance, if a larger improvement in intelligence or cost outweighs it."><input type="checkbox" data-tolerance-metric="time" aria-label="Allow more time within tolerance"> Time</label><label title="Allow higher cost within tolerance, if a larger improvement in intelligence or time outweighs it."><input type="checkbox" data-tolerance-metric="cost" aria-label="Allow higher cost within tolerance"> Cost</label></span>
           <label title="Show missing time as a horizontal stripe, missing intelligence as a vertical line, and missing cost as an X. If time is unknown, the X is inside the model label. Models with none of these three values are excluded. These models are not part of Pareto comparisons."><input type="checkbox" data-control="showMissing"> Show models with missing data</label>
           <label title="Reduce vertical space without overlapping model labels. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
@@ -407,6 +424,7 @@
         #${ID} .aa3d-regex{flex:none;font-size:12px}#${ID} .aa3d-search-error{margin:.2rem 0;color:#b42318;font-size:11px}#${ID} input[type=search][aria-invalid=true]{border-color:#b42318}
         #${ID} .aa3d-dominance{gap:.35rem}#${ID} .aa3d-dominance output{min-width:2.5em;font-variant-numeric:tabular-nums}
         #${ID} .aa3d-dominance[data-disabled=true]{opacity:.5}#${ID} .aa3d-dominance input:disabled{cursor:not-allowed}
+        #${ID} .aa3d-tolerance-metrics{display:inline-flex;align-items:center;flex-wrap:wrap;gap:.35rem .65rem;font-size:12px}#${ID} .aa3d-tolerance-metrics>span{color:#555}#${ID} .aa3d-tolerance-metrics[data-disabled=true]{opacity:.5}
         #${ID} .aa3d-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:end;gap:.75rem;margin:.65rem 0}
         #${ID} .aa3d-range{min-width:0;padding:.45rem .6rem;border:1px solid #eee;border-radius:5px}
         #${ID} .aa3d-range label{display:block;font-size:11px;font-weight:600;color:#555}
@@ -456,6 +474,8 @@
         requestAnimationFrame(placePopup);
       });
       chart.querySelectorAll('input[type="checkbox"][data-control]').forEach(input => { input.checked = state[input.dataset.control]; });
+      const toleranceMetricsInputs = chart.querySelectorAll('input[data-tolerance-metric]');
+      toleranceMetricsInputs.forEach(input => { input.checked = state.toleranceMetrics[input.dataset.toleranceMetric]; });
       const toleranceInput = chart.querySelector('input[data-control="dominanceTolerance"]');
       toleranceInput.value = state.dominanceTolerance;
       chart.querySelector('[data-value="dominanceTolerance"]').textContent = `${state.dominanceTolerance}%`;
@@ -463,18 +483,21 @@
         const enabled = state.hideDominated;
         toleranceInput.disabled = !enabled;
         toleranceInput.closest('.aa3d-dominance').dataset.disabled = String(!enabled);
+        toleranceMetricsInputs.forEach(input => { input.disabled = !enabled; });
+        chart.querySelector('.aa3d-tolerance-metrics').dataset.disabled = String(!enabled);
       };
       updateTolerance();
       const helpText = {
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
         bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. A price appears inside its bubble when it fits, or in the model label when it does not. The model variant is shown below the name. Labels appear in shaded callouts with diagonal pointers. The chart grows smoothly when labels need more space. Each price uses only enough decimal places to distinguish it from other visible prices, with at least cents and no trailing zeros. Free models show $0. Prices stay at the centre of small bubbles and can extend past their edge. If two prices overlap, one moves to its model callout. Select a bubble for model details. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
-        dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. The Tolerance slider can also hide near matches. Open “Why models are hidden” below the filters for exact comparisons.',
+        dominance: 'Hide a model when another is at least as smart, fast, and cheap, with an improvement in one measure. The Tolerance slider can also hide near matches. Choose which measures may be worse under “Allow drawbacks in”. Open “Why models are hidden” below the filters for exact comparisons.',
         tolerance: [
           ['Tolerance determines when one model can hide another.'],
           ['At ', ['0%'], ', the other model must be at least as smart, fast, and cheap—and better in at least one.'],
-          ['At ', ['higher values'], ', small disadvantages are allowed if the biggest improvement outweighs the biggest drawback.'],
-          ['For example, at ', ['4%'], ", a model that's ", ['5% faster'], ' but ', ['4% more expensive'], ' can hide an equally smart model.'],
+          ['At ', ['higher values'], ', small disadvantages are allowed ', ['only in the checked measures'], ' under “Allow drawbacks in”. An unchecked measure must be at least as good. If no measures are checked, comparisons use exact values.'],
+          ['The ', ['biggest percentage improvement'], ' in any of the three measures must exceed the ', ['biggest percentage drawback'], '. Each drawback must also stay within the tolerance.'],
+          ['For example, with ', ['only Cost checked'], ' at ', ['4%'], ", a model that's ", ['5% faster'], ' but ', ['4% more expensive'], ' can hide an equally smart model. It cannot hide a model if it is less intelligent or slower.'],
           [['Higher tolerance hides more models.'], ' All percentages are ', ['relative to the model being hidden'], '. The purple 3D Pareto outlines always use ', ['exact values'], '.'],
         ],
       };
@@ -517,6 +540,12 @@
         saveSettings();
         if (input.dataset.control === 'dominanceTolerance') scheduleLiveRefresh();
         else scheduleRefresh(true);
+      }));
+      toleranceMetricsInputs.forEach(input => input.addEventListener('input', () => {
+        state.toleranceMetrics[input.dataset.toleranceMetric] = input.checked;
+        state.pinned = null;
+        saveSettings();
+        scheduleRefresh(true);
       }));
       chart.querySelectorAll('input[data-filter]').forEach(input => input.addEventListener('input', () => {
         const key = input.dataset.filter;
@@ -561,6 +590,8 @@
         state.filters = {};
         state.hideDominated = false;
         state.dominanceTolerance = DEFAULT_DOMINANCE_TOLERANCE;
+        state.toleranceMetrics = { ...DEFAULT_TOLERANCE_METRICS };
+        toleranceMetricsInputs.forEach(input => { input.checked = state.toleranceMetrics[input.dataset.toleranceMetric]; });
         chart.querySelector('[data-control="search"]').value = '';
         chart.querySelector('[data-control="search"]').placeholder = 'Filter by model or provider';
         chart.querySelector('[data-control="regex"]').checked = false;
@@ -1181,13 +1212,13 @@
     pareto.textContent = missingMetrics(model).length ? 'Pareto: not evaluated (missing data)' : `2D Pareto: ${model.pareto2 ? 'yes' : 'no'} · 3D Pareto: ${model.pareto3 ? 'yes' : 'no'}`;
     pareto.style.marginTop = '5px'; tooltip.append(pareto);
     const incomplete = missingMetrics(model).length > 0;
-    const better = incomplete ? [] : comparisonModels.filter(other => dominates(model, other, state.dominanceTolerance / 100))
+    const better = incomplete ? [] : comparisonModels.filter(other => dominates(model, other, state.dominanceTolerance / 100, state.toleranceMetrics))
       .sort((a, b) => b.intelligence - a.intelligence || a.cost - b.cost || a.time - b.time);
     if (better.length) {
       const section = document.createElement('div'); section.className = 'aa3d-better';
       const heading = document.createElement('strong'); heading.textContent = `Better models (${better.length})`;
       const note = document.createElement('div'); note.className = 'aa3d-metric-caption';
-      note.textContent = `AA selection · Tolerance ${state.dominanceTolerance}% · Compared with this model`;
+      note.textContent = `AA selection · Tolerance ${toleranceSummary()} · Compared with this model`;
       section.append(heading, note);
       const list = document.createElement('div'); list.className = 'aa3d-better-list';
       list.tabIndex = 0; list.setAttribute('role', 'region'); list.setAttribute('aria-label', 'Better models');
@@ -1290,13 +1321,13 @@
       return true;
     });
     const complete = models.filter(model => !missingMetrics(model).length);
-    const hidden = state.hideDominated ? complete.map(model => ({ model, by: complete.find(other => dominates(model, other, state.dominanceTolerance / 100)) })).filter(item => item.by) : [];
+    const hidden = state.hideDominated ? complete.map(model => ({ model, by: complete.find(other => dominates(model, other, state.dominanceTolerance / 100, state.toleranceMetrics)) })).filter(item => item.by) : [];
     if (state.hideDominated) {
       const hiddenIds = new Set(hidden.map(item => item.model.id));
       models = models.filter(model => !hiddenIds.has(model.id));
     }
     syncNativeModelSelection(data, models);
-    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.releaseDate, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.showMissing, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.search, state.regex, state.filters, chart.clientWidth]);
+    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.releaseDate, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.showMissing, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.toleranceMetrics, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
     updateExplanations(state.showMissing ? rawModels : all, hidden);
