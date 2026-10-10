@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.7.1
+// @version      2.7.3
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -16,13 +16,14 @@
   'use strict';
 
   const PREFIX = '[AA 3D Bubble]';
+  const VERSION = '2.7.3';
   const ID = 'aa3d-bubble-chart';
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 4;
   const DEFAULT_TOLERANCE_METRICS = { intelligence: true, time: true, cost: true };
   const NS = 'http://www.w3.org/2000/svg';
   const DAY_MS = 86400000;
-  const state = { showMissing: false, hideLocalUnknownTime: false, compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, toleranceMetrics: { ...DEFAULT_TOLERANCE_METRICS }, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
+  const state = { showMissing: false, hideLocalUnknownTime: false, compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, toleranceMetrics: { ...DEFAULT_TOLERANCE_METRICS }, search: '', regex: false, searchHistory: { text: [], regex: [] }, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
   const filterMetrics = [
     { metric: 'intelligence', key: 'intelligenceMin', direction: 'min', step: 0.1, digits: 1 },
     { metric: 'time', key: 'timeMax', step: 0.1, digits: 1 },
@@ -45,6 +46,9 @@
       }
       if (typeof saved.search === 'string') state.search = saved.search.slice(0, 200);
       if (typeof saved.regex === 'boolean') state.regex = saved.regex;
+      for (const mode of ['text', 'regex']) {
+        if (Array.isArray(saved.searchHistory?.[mode])) state.searchHistory[mode] = [...new Set(saved.searchHistory[mode].filter(value => typeof value === 'string' && value.trim() && value.length <= 200))].slice(0, 100);
+      }
       for (const { key } of filterMetrics) {
         if (Number.isFinite(saved.filters?.[key]) && saved.filters[key] >= 0) state.filters[key] = saved.filters[key];
       }
@@ -54,7 +58,7 @@
   function saveSettings() {
     const filters = Object.fromEntries(filterMetrics.filter(({ key }) => Number.isFinite(state.filters[key])).map(({ key }) => [key, state.filters[key]]));
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ showMissing: state.showMissing, hideLocalUnknownTime: state.hideLocalUnknownTime, compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, toleranceMetrics: state.toleranceMetrics, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ showMissing: state.showMissing, hideLocalUnknownTime: state.hideLocalUnknownTime, compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, toleranceMetrics: state.toleranceMetrics, search: state.search, regex: state.regex, searchHistory: state.searchHistory, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
     } catch (_) { /* Keep the current page usable if storage is unavailable. */ }
   }
   restoreSettings();
@@ -264,13 +268,21 @@
     if (state.regex) {
       try {
         const pattern = new RegExp(query, 'i');
-        return { matches: model => pattern.test(model.name) || pattern.test(model.provider), error: '' };
+        return { matches: model => pattern.test(`${model.name} ${model.provider}`), error: '' };
       } catch (_) {
         return { matches: () => true, error: 'Invalid regular expression. Check parentheses, brackets, and escapes. Search is ignored until you fix it.' };
       }
     }
     const text = query.toLocaleLowerCase();
     return { matches: model => `${model.name} ${model.provider}`.toLocaleLowerCase().includes(text), error: '' };
+  }
+
+  function rememberSearch() {
+    const query = state.search.trim();
+    if (!query || getSearchMatcher().error) return;
+    const mode = state.regex ? 'regex' : 'text';
+    state.searchHistory[mode] = [query, ...state.searchHistory[mode].filter(value => value !== query)].slice(0, 100);
+    saveSettings();
   }
 
   function sameIds(a, b) {
@@ -406,6 +418,7 @@
       chart.id = ID;
       chart.lang = 'en';
       chart.innerHTML = `
+        <span class="aa3d-version" aria-label="Script version ${VERSION}">v${VERSION}</span>
         <div class="aa3d-head"><div><h3>Intelligence Index vs. Time per Task</h3><p>Higher = smarter · Left = faster · Smaller bubble = cheaper. Select a bubble for model details.</p></div><div class="aa3d-picker-wrap"><span>AA model selection</span><button type="button" class="aa3d-model-picker" aria-label="Select AA models" aria-haspopup="dialog" aria-expanded="false" disabled><span>Select models</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg></button></div></div>
         <div class="aa3d-legend"><span><i class="aa3d-example-dot"></i> Provider colour</span><span>Bubble diameter shows cost as a share of the highest visible cost. <button type="button" class="aa3d-help-button" data-help="bubbleSize" aria-label="Explain bubble size" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Dashed line: 2D Pareto <button type="button" class="aa3d-help-button" data-help="pareto2" aria-label="Explain 2D Pareto line" aria-controls="aa3d-help" aria-expanded="false">?</button></span><span>Purple outline: 3D Pareto <button type="button" class="aa3d-help-button" data-help="pareto3" aria-label="Explain 3D Pareto outline" aria-controls="aa3d-help" aria-expanded="false">?</button></span><details><summary>Provider colours</summary><div class="aa3d-provider-list"></div></details></div>
         <div class="aa3d-controls">
@@ -415,7 +428,7 @@
           <label title="Show missing time as a horizontal stripe, missing intelligence as a vertical line, and missing cost as an X. If time is unknown, the X is inside the model label. Models with none of these three values are excluded. These models are not part of Pareto comparisons."><input type="checkbox" data-control="showMissing"> Show models with missing data</label>
           <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideLocalUnknownTime"> Hide local-only models with unknown time</label><button type="button" class="aa3d-help-button" data-help="localModels" aria-label="Explain local model filter" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <label title="Reduce vertical space without overlapping model labels. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
-          <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
+          <div class="aa3d-search-wrap"><div class="aa3d-search-field"><input type="search" autocomplete="off" aria-expanded="false" aria-controls="aa3d-search-history" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><div id="aa3d-search-history" class="aa3d-search-history" aria-label="Previous searches" hidden></div></div><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
         <p class="aa3d-missing-key" hidden>Missing data: horizontal stripe = time unknown · vertical line = intelligence unknown · X = cost unknown. If time is unknown, the X is inside the model label. Models with none of these three values are excluded. Stripe labels do not show task time. Select a stripe or X for details. Filter by model or provider to see individual labels for crowded stripes. Filters use known values only. These models are not part of Pareto comparisons.</p>
         <div class="aa3d-help" id="aa3d-help" hidden></div>
@@ -435,7 +448,8 @@
         <div class="aa3d-plot"><svg role="group" aria-label="Intelligence Index by Time per Task; bubble diameter shows Cost per Task"></svg><div class="aa3d-tip" id="aa3d-tooltip" role="tooltip" hidden></div></div>`;
       const style = document.createElement('style');
       style.textContent = `
-        #${ID}{margin-top:1.5rem;padding:1rem;border:1px solid #e5e5e5;border-radius:.5rem;background:#fff;color:#171717;font:13px system-ui,sans-serif}
+        #${ID}{position:relative;margin-top:1.5rem;padding:1.75rem 1rem 1rem;border:1px solid #e5e5e5;border-radius:.5rem;background:#fff;color:#171717;font:13px system-ui,sans-serif}
+        #${ID} .aa3d-version{position:absolute;top:.4rem;right:.65rem;color:#666;font:11px system-ui,sans-serif;line-height:1.2}
         #${ID} *{box-sizing:border-box}#${ID} .aa3d-head{display:flex;justify-content:space-between;gap:1rem}
         #${ID} h3{margin:0;font:20px Georgia,serif}#${ID} p{margin:.25rem 0 0;color:#666;font-size:12px}
         #${ID} .aa3d-model-picker{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex:none;min-width:180px;max-width:260px;height:32px;padding:0 .75rem;border:1px solid #e5e5e5;border-radius:8px;background:#f4f4f5;color:#171717;font:13px system-ui,sans-serif;cursor:pointer}#${ID} .aa3d-model-picker:hover{border-color:#737373}#${ID} .aa3d-model-picker:disabled{opacity:.5;cursor:default}#${ID} .aa3d-model-picker span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#${ID} .aa3d-model-picker svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -446,6 +460,14 @@
         #${ID} .aa3d-control-group{display:inline-flex;align-items:center;gap:.2rem}#${ID} .aa3d-help-button{width:21px;height:21px;border:1px solid #aaa;border-radius:50%;background:#fff;color:#444;cursor:pointer;font-weight:700}#${ID} .aa3d-help{max-width:700px;padding:.45rem .65rem;border-left:3px solid #7837aa;background:#f7f2fb;line-height:1.45}#${ID} .aa3d-filter-note{margin:.15rem 0 .5rem;font-size:11px}
         #${ID} label{display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap;cursor:pointer}
         #${ID} .aa3d-search-wrap{display:flex;align-items:center;gap:.5rem;min-width:250px;max-width:370px;flex:1;margin-left:auto}
+        #${ID} .aa3d-search-field{position:relative;flex:1;min-width:0}
+        #${ID} .aa3d-search-history{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:20;max-height:260px;overflow:auto;padding:4px;border:1px solid #ddd;border-radius:5px;background:#fff;box-shadow:0 4px 12px #0002}
+        #${ID} .aa3d-search-history[hidden]{display:none}
+        #${ID} .aa3d-search-history-row{display:flex}
+        #${ID} .aa3d-search-history button{border:0;background:#fff;color:#171717;cursor:pointer;padding:7px;text-align:left;font:12px system-ui,sans-serif}
+        #${ID} .aa3d-search-history button:hover,#${ID} .aa3d-search-history button:focus-visible{background:#f3eaf9}
+        #${ID} .aa3d-search-history-use{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        #${ID} .aa3d-search-history-delete{flex:none;width:30px;text-align:center!important}
         #${ID} input[type=search]{height:30px;min-width:0;width:100%;flex:1;padding:0 .55rem;border:1px solid #ddd;border-radius:5px;background:#fff;color:#171717}
         #${ID} .aa3d-regex{flex:none;font-size:12px}#${ID} .aa3d-search-error{margin:.2rem 0;color:#b42318;font-size:11px}#${ID} input[type=search][aria-invalid=true]{border-color:#b42318}
         #${ID} .aa3d-dominance{gap:.35rem}#${ID} .aa3d-dominance output{min-width:2.5em;font-variant-numeric:tabular-nums}
@@ -554,8 +576,71 @@
           button.setAttribute('aria-expanded', 'true');
         }
       }));
+      const searchField = chart.querySelector('.aa3d-search-field');
+      const searchInput = searchField.querySelector('input');
+      const historyMenu = searchField.querySelector('.aa3d-search-history');
+      let historyOpen = false;
+      let deletedSearch = null;
+      const renderHistory = () => {
+        const mode = state.regex ? 'regex' : 'text';
+        const prefix = searchInput.value.toLocaleLowerCase();
+        const entries = state.searchHistory[mode].filter(value => value.toLocaleLowerCase().startsWith(prefix));
+        historyMenu.replaceChildren();
+        for (const value of entries) {
+          const row = document.createElement('div');
+          row.className = 'aa3d-search-history-row';
+          const use = document.createElement('button');
+          use.type = 'button';
+          use.className = 'aa3d-search-history-use';
+          use.textContent = value;
+          use.title = value;
+          use.addEventListener('click', () => {
+            searchInput.value = value;
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            rememberSearch();
+            searchInput.focus();
+            historyOpen = false;
+            renderHistory();
+          });
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'aa3d-search-history-delete';
+          remove.textContent = 'X';
+          remove.setAttribute('aria-label', `Delete search: ${value}`);
+          remove.addEventListener('mousedown', event => event.preventDefault());
+          remove.addEventListener('click', () => {
+            deletedSearch = { mode, value };
+            state.searchHistory[mode] = state.searchHistory[mode].filter(item => item !== value);
+            saveSettings();
+            renderHistory();
+            searchInput.focus();
+          });
+          row.append(use, remove);
+          historyMenu.append(row);
+        }
+        historyMenu.hidden = !historyOpen || !entries.length;
+        searchInput.setAttribute('aria-expanded', String(!historyMenu.hidden));
+      };
+      searchInput.addEventListener('focus', () => { historyOpen = true; renderHistory(); });
+      searchInput.addEventListener('click', () => { historyOpen = true; renderHistory(); });
+      searchField.addEventListener('focusout', event => {
+        if (searchField.contains(event.relatedTarget)) return;
+        if (event.target === searchInput && !(deletedSearch?.mode === (state.regex ? 'regex' : 'text') && deletedSearch.value === state.search.trim())) rememberSearch();
+        historyOpen = false;
+        renderHistory();
+      });
+      searchInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') { event.preventDefault(); rememberSearch(); historyOpen = false; renderHistory(); }
+        if (event.key === 'Escape') { historyOpen = false; renderHistory(); }
+        if (event.key === 'ArrowDown') {
+          historyOpen = true;
+          renderHistory();
+          const first = historyMenu.querySelector('button');
+          if (first) { event.preventDefault(); first.focus(); }
+        }
+      });
       chart.querySelectorAll('input[data-control]').forEach(input => input.addEventListener('input', () => {
-        if (input.dataset.control === 'search') state.search = input.value;
+        if (input.dataset.control === 'search') { state.search = input.value; deletedSearch = null; historyOpen = true; renderHistory(); }
         else if (input.dataset.control === 'dominanceTolerance') {
           state.dominanceTolerance = Number(input.value);
           chart.querySelector('[data-value="dominanceTolerance"]').textContent = `${state.dominanceTolerance}%`;
@@ -563,6 +648,7 @@
         else state[input.dataset.control] = input.checked;
         if (input.dataset.control === 'hideDominated') updateTolerance();
         if (input.dataset.control === 'regex') chart.querySelector('[data-control="search"]').placeholder = state.regex ? 'Regex: (Claude)|(GPT)' : 'Filter by model or provider';
+        if (input.dataset.control === 'regex') { historyOpen = true; renderHistory(); }
         state.pinned = null;
         saveSettings();
         if (input.dataset.control === 'dominanceTolerance') scheduleLiveRefresh();
@@ -612,6 +698,9 @@
         });
       });
       chart.querySelector('.aa3d-clear').addEventListener('click', () => {
+        rememberSearch();
+        historyOpen = false;
+        renderHistory();
         state.search = '';
         state.regex = false;
         state.filters = {};
