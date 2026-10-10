@@ -25,3 +25,17 @@
 - Värskenda testivahelehte ning käivita kohalik skript uuesti ühe korra. Kontrolli, et mõlema režiimi ajalugu säilib eraldi ja kustutatud rida puudub.
 - Salvesta ekraanipilt avatud rippmenüüst. Kontrolli pildilt, et read ja nende X-nupud on nähtavad.
 - Taasta testi järel salvestatud väärtus. Kui võti enne testi puudus, eemalda testis loodud võti. Sulge enda loodud testivaheleht.
+
+## Automaatne avaldamine Greasy Forkis
+
+- GitHubi hoidlas `henno/artificial-analysis-bubble-chart` on aktiivne webhook ID-ga `695391889`. See saadab `push`-teated Greasy Forki. Kasutusel on JSON ja TLS-sertifikaadi kontroll.
+- Greasy Forki skripti ID on `597690`. Selle lähtefaili aadress on `https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js`.
+- Avaldamiseks suurenda userscripti `@version` ja nähtavat `VERSION` väärtust koos. Kontrolli muudatust AA päris lehel. Käivita `node --check artificial-analysis-3d-bubble.user.js` ja `node --test tests/*.test.cjs`. Seejärel tee commit ja push `main`-harusse.
+- Kui push muudab seda userscripti faili `main`-harus, uuendab Greasy Fork skripti automaatselt. Ainult dokumentatsiooni muutmine ei avalda uut skriptiversiooni. Eraldi avaldamisskripti ega käsitsi vormi täitmist pole vaja.
+- Kontrolli teate tulemust käsuga `gh api repos/henno/artificial-analysis-bubble-chart/hooks/695391889/deliveries`. Leia vastava push-teate ID ning loe selle vastus käsuga `gh api repos/henno/artificial-analysis-bubble-chart/hooks/695391889/deliveries/ID`. Oota HTTP 200 vastust, skripti `597690` kirjet väljas `updated_scripts` ja tühja `updated_failed` loendit.
+- Säilita teate ID täpselt. Kasuta JSON-i lugemiseks Pythonit või kopeeri ID GitHubi liidesest. Suure ID teisendamine `jq` kaudu võib muuta selle lõpunumbreid ja põhjustada detailpäringus HTTP 404 vastuse.
+- Kontrolli ka Greasy Forki avalikku versiooni ja allalaaditud koodi. Selleks võib kasutada käsku `python3 scripts/publish.py --check`. Greasy Fork asendab päises `@updateURL` ja `@downloadURL` read enda aadressidega; kontroll arvestab seda ja võrdleb ülejäänud faili.
+- Avalik versioon ja allalaaditav fail võivad uueneda eri ajal. Kui teate vastus kinnitab uuendust, kuid kood on veel vana, kontrolli hiljem uuesti. Ära saada uut avaldamisteadet ainult selle viivituse tõttu.
+- Avaldamine ei kinnita Tampermonkeysse paigaldamist. Pärast paigaldatud skripti uuendamist värskenda avatud AA vahelehed ja kontrolli paremas ülanurgas versiooninumbrit.
+- Seadistuse muutmiseks ava Greasy Forki skripti Admin-leht ja konto webhook'i leht. Konto kasutab Google'i kaudu sisselogimist. Säilita olemasolev webhook'i saladus; ära loo seda uuesti ilma vajaduseta. Ära lisa saladust, sessiooniküpsiseid ega võtmeid projekti failidesse või tööriista väljundisse.
+- GitHubi webhook'i ja Greasy Forki uuendust kontrolliti versiooni `2.7.4` automaatse avaldamisega. Täpsem seadistus on failis `PUBLISHING.md`.
