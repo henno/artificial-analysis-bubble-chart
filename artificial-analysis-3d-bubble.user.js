@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.7.3
+// @version      2.7.4
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -16,7 +16,7 @@
   'use strict';
 
   const PREFIX = '[AA 3D Bubble]';
-  const VERSION = '2.7.3';
+  const VERSION = '2.7.4';
   const ID = 'aa3d-bubble-chart';
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 4;

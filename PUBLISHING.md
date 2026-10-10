@@ -1,5 +1,17 @@
 # Publish to Greasy Fork
 
+## GitHub webhook
+
+The webhook is configured for `henno/artificial-analysis-bubble-chart`: GitHub webhook ID `695391889`, active, `push` events, JSON content, and SSL verification. The Greasy Fork account holds the signing secret; GitHub stores the same secret. The secret is not stored in this repository.
+
+Set the Greasy Fork script's source URL to `https://raw.githubusercontent.com/henno/artificial-analysis-bubble-chart/main/artificial-analysis-3d-bubble.user.js`. Add the account's Greasy Fork webhook URL to the GitHub repository. Use JSON content, the Greasy Fork secret, the `push` event, and SSL verification.
+
+After setup, a push that changes the userscript on `main` publishes it to Greasy Fork. Increase both `@version` and the visible `VERSION` before a new script release. The webhook matches the source branch and file path. Commits that only change documentation do not publish the script.
+
+Check the GitHub webhook delivery response and the public Greasy Fork version after a release. `python3 scripts/publish.py --check` also compares the downloaded code. The Python command is optional; GitHub sends publication notifications itself.
+
+## Optional command
+
 Use Python 3 and Node.js. The publisher uses the supported Greasy Fork GitHub webhook. It does not need a browser session or a password.
 
 ## Set up once

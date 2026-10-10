@@ -20,6 +20,7 @@ class PublishTest(unittest.TestCase):
 
     def test_credentials_can_only_go_to_greasy_fork(self):
         publish.validate_url('https://greasyfork.org/en/users/1647503-henno/webhook')
+        publish.validate_url('https://api.greasyfork.org/en/users/1647503-henno/webhook')
         for url in ['http://greasyfork.org/en/users/1/webhook',
                     'https://greasyfork.org.evil.test/en/users/1/webhook',
                     'https://greasyfork.org/en/users/1/webhook?secret=value']:

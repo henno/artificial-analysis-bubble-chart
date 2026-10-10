@@ -67,7 +67,7 @@ def version_parts(value):
 
 def validate_url(url):
     parsed = urllib.parse.urlsplit(url)
-    if (parsed.scheme != 'https' or parsed.netloc != 'greasyfork.org'
+    if (parsed.scheme != 'https' or parsed.netloc not in ('greasyfork.org', 'api.greasyfork.org')
             or not re.fullmatch(r'/en/users/\d+(?:-[^/]+)?/webhook', parsed.path)
             or parsed.query or parsed.fragment):
         raise ValueError('Use the Greasy Fork HTTPS webhook URL from your account.')
