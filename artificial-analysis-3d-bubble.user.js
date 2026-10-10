@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.7.0
+// @version      2.7.1
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -22,7 +22,7 @@
   const DEFAULT_TOLERANCE_METRICS = { intelligence: true, time: true, cost: true };
   const NS = 'http://www.w3.org/2000/svg';
   const DAY_MS = 86400000;
-  const state = { showMissing: false, compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, toleranceMetrics: { ...DEFAULT_TOLERANCE_METRICS }, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
+  const state = { showMissing: false, hideLocalUnknownTime: false, compactVertical: false, hideDominated: true, dominanceTolerance: DEFAULT_DOMINANCE_TOLERANCE, toleranceMetrics: { ...DEFAULT_TOLERANCE_METRICS }, search: '', regex: false, filters: {}, modelSelectionInitialized: false, nativeBaseIds: null, nativeAppliedIds: null, nativePendingIds: null, nativePendingAt: 0, pinned: null, timer: 0, frame: 0, signature: '', url: location.href };
   const filterMetrics = [
     { metric: 'intelligence', key: 'intelligenceMin', direction: 'min', step: 0.1, digits: 1 },
     { metric: 'time', key: 'timeMax', step: 0.1, digits: 1 },
@@ -34,6 +34,7 @@
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (!saved || typeof saved !== 'object') return;
       if (typeof saved.showMissing === 'boolean') state.showMissing = saved.showMissing;
+      if (typeof saved.hideLocalUnknownTime === 'boolean') state.hideLocalUnknownTime = saved.hideLocalUnknownTime;
       if (typeof saved.compactVertical === 'boolean') state.compactVertical = saved.compactVertical;
       if (typeof saved.hideDominated === 'boolean') state.hideDominated = saved.hideDominated;
       // Existing users keep their AA model selection. New users select all models once.
@@ -53,7 +54,7 @@
   function saveSettings() {
     const filters = Object.fromEntries(filterMetrics.filter(({ key }) => Number.isFinite(state.filters[key])).map(({ key }) => [key, state.filters[key]]));
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ showMissing: state.showMissing, compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, toleranceMetrics: state.toleranceMetrics, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ showMissing: state.showMissing, hideLocalUnknownTime: state.hideLocalUnknownTime, compactVertical: state.compactVertical, hideDominated: state.hideDominated, dominanceTolerance: state.dominanceTolerance, toleranceMetrics: state.toleranceMetrics, search: state.search, regex: state.regex, filters, modelSelectionInitialized: state.modelSelectionInitialized, nativeBaseIds: state.nativeBaseIds }));
     } catch (_) { /* Keep the current page usable if storage is unavailable. */ }
   }
   restoreSettings();
@@ -172,11 +173,35 @@
     return { models, allPageModels: store.allPageModels, selectedPageModels: store.selectedPageModels, setSelectedPageModels: store.setSelectedPageModels, colorById, colorByProvider, selected: selectedIds.length, visible: visibleIds.length, source: visibleIds.length ? 'native scatter + React models' : 'React selection' };
   }
 
-  function modelMetrics(models, colorById, colorByProvider) {
+  function modelReleaseKey(model) {
+    return model.release?.slug || model.slug || model.id;
+  }
+
+  function hasApiData(model) {
+    // A missing task time does not mean that the model has no API.
+    // A zero API price is valid. Check all variants of the same release.
+    return [model.price1mInputTokens, model.price1mOutputTokens, model.cacheHitPrice,
+      model.price1mBlended0To3To1, model.price1mBlended7To2To1, model.price1mBlended0To1To1,
+      model.price1mBlended100To1To1, model.price1mBlended0To100To1,
+      model.timescaleData?.medianOutputSpeed, model.timescaleData?.medianTimeToFirstChunk,
+      model.endToEndResponseTime, model.timeToFirstAnswerToken].some(value => finite(value) && value >= 0);
+  }
+
+  function apiReleaseKeys(models) {
+    return new Set(models.filter(hasApiData).map(modelReleaseKey));
+  }
+
+  function isLocalOnlyModel(model, apiReleases) {
+    // AA has no explicit local-only field. Use its API data as an estimate.
+    return model.isOpenWeights === true && !apiReleases.has(modelReleaseKey(model));
+  }
+
+  function modelMetrics(models, colorById, colorByProvider, apiReleases) {
     return models.map(model => ({
       id: model.id,
       name: model.shortName || model.name || model.slug || 'Unknown model',
       provider: model.creator?.name || 'Unknown provider',
+      localOnly: isLocalOnlyModel(model, apiReleases),
       releaseDate: model.releaseDate,
       releaseDay: releaseDay(model.releaseDate),
       color: colorById.get(model.id) || colorByProvider.get(model.creator?.name) || model.creator?.color || '#64748b',
@@ -230,7 +255,7 @@
   }
 
   function hasNativeModelFilter() {
-    return state.showMissing || state.hideDominated || state.search.trim() !== '' || filterMetrics.some(({ key }) => state.filters[key] != null && state.filters[key] !== '');
+    return state.showMissing || state.hideLocalUnknownTime || state.hideDominated || state.search.trim() !== '' || filterMetrics.some(({ key }) => state.filters[key] != null && state.filters[key] !== '');
   }
 
   function getSearchMatcher() {
@@ -388,6 +413,7 @@
           <span class="aa3d-control-group"><label class="aa3d-dominance">Tolerance: <output data-value="dominanceTolerance">4%</output><input type="range" min="0" max="50" step="1" data-control="dominanceTolerance" aria-label="Dominance tolerance percentage"></label><button type="button" class="aa3d-help-button" data-help="tolerance" aria-label="Explain tolerance" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <span class="aa3d-tolerance-metrics" role="group" aria-label="Metrics that may be worse within tolerance"><span>Allow drawbacks in:</span><label title="Allow lower intelligence within tolerance, if a larger improvement in time or cost outweighs it."><input type="checkbox" data-tolerance-metric="intelligence" aria-label="Allow lower intelligence within tolerance"> Intelligence</label><label title="Allow more task time within tolerance, if a larger improvement in intelligence or cost outweighs it."><input type="checkbox" data-tolerance-metric="time" aria-label="Allow more time within tolerance"> Time</label><label title="Allow higher cost within tolerance, if a larger improvement in intelligence or time outweighs it."><input type="checkbox" data-tolerance-metric="cost" aria-label="Allow higher cost within tolerance"> Cost</label></span>
           <label title="Show missing time as a horizontal stripe, missing intelligence as a vertical line, and missing cost as an X. If time is unknown, the X is inside the model label. Models with none of these three values are excluded. These models are not part of Pareto comparisons."><input type="checkbox" data-control="showMissing"> Show models with missing data</label>
+          <span class="aa3d-control-group"><label><input type="checkbox" data-control="hideLocalUnknownTime"> Hide local-only models with unknown time</label><button type="button" class="aa3d-help-button" data-help="localModels" aria-label="Explain local model filter" aria-controls="aa3d-help" aria-expanded="false">?</button></span>
           <label title="Reduce vertical space without overlapping model labels. Intelligence values keep their order, but spacing is not linear."><input type="checkbox" data-control="compactVertical"> Compact vertical spacing</label>
           <div class="aa3d-search-wrap"><input type="search" data-control="search" maxlength="200" placeholder="Filter by model or provider" aria-label="Filter by model or provider" aria-describedby="aa3d-search-error"><label class="aa3d-regex" title="Use a regular expression, such as (Claude)|(GPT). Matching ignores case."><input type="checkbox" data-control="regex"> Regex</label></div>
         </div>
@@ -488,6 +514,7 @@
       };
       updateTolerance();
       const helpText = {
+        localModels: 'Hide open-weight models with unknown task time when AA has no API price or performance data for that release. API data from any variant keeps the release visible. Closed-weight models and models with known task time stay visible. AA has no explicit local-only field and does not list every API provider, so this filter is an estimate based on the loaded AA data. Your choice is saved and also updates AA\'s other charts.',
         pareto2: 'The dashed line joins models that have no faster model with equal or higher intelligence. Cost is not part of this line.',
         pareto3: 'A purple outline marks a model for which no other model is at least as smart, fast, and cheap, with one strict improvement. This outline uses exact values, even when tolerance is set.',
         bubbleSize: 'The highest-cost visible model has the largest bubble. Half the cost gives half its diameter. A price appears inside its bubble when it fits, or in the model label when it does not. The model variant is shown below the name. Labels appear in shaded callouts with diagonal pointers. The chart grows smoothly when labels need more space. Each price uses only enough decimal places to distinguish it from other visible prices, with at least cents and no trailing zeros. Free models show $0. Prices stay at the centre of small bubbles and can extend past their edge. If two prices overlap, one moves to its model callout. Select a bubble for model details. Very small bubbles keep a 3 px radius so you can see them. The scale changes when the visible models change.',
@@ -588,6 +615,8 @@
         state.search = '';
         state.regex = false;
         state.filters = {};
+        state.hideLocalUnknownTime = false;
+        chart.querySelector('[data-control="hideLocalUnknownTime"]').checked = false;
         state.hideDominated = false;
         state.dominanceTolerance = DEFAULT_DOMINANCE_TOLERANCE;
         state.toleranceMetrics = { ...DEFAULT_TOLERANCE_METRICS };
@@ -1299,7 +1328,8 @@
     if (!data) { status.textContent = 'Waiting for Artificial Analysis model data…'; return; }
     if (initializeModelSelection(data)) { status.textContent = 'Selecting all AA models…'; return; }
     updateModelPicker(data);
-    const rawModels = modelMetrics(data.models, data.colorById, data.colorByProvider)
+    const apiReleases = apiReleaseKeys(data.allPageModels);
+    const rawModels = modelMetrics(data.models, data.colorById, data.colorByProvider, apiReleases)
       .filter(model => ['intelligence', 'time', 'cost'].some(key => knownMetric(model, key)));
     const all = rawModels.filter(model => !missingMetrics(model).length);
     comparisonModels = all;
@@ -1312,6 +1342,7 @@
     searchError.textContent = error;
     searchError.hidden = !error;
     let models = (state.showMissing ? rawModels : all).filter(model => {
+      if (state.hideLocalUnknownTime && model.localOnly && !knownMetric(model, 'time')) return false;
       if (!matches(model)) return false;
       for (const { metric, key, direction } of filterMetrics) {
         const limit = bound(key);
@@ -1327,7 +1358,7 @@
       models = models.filter(model => !hiddenIds.has(model.id));
     }
     syncNativeModelSelection(data, models);
-    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.releaseDate, m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), state.showMissing, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.toleranceMetrics, state.search, state.regex, state.filters, chart.clientWidth]);
+    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.releaseDate, m.isOpenWeights, modelReleaseKey(m), m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), [...apiReleases].sort(), state.showMissing, state.hideLocalUnknownTime, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.toleranceMetrics, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
     updateExplanations(state.showMissing ? rawModels : all, hidden);
