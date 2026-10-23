@@ -27,6 +27,7 @@ test('a free API or a performance measurement keeps a model available', () => {
     { price1mInputTokens: 0 },
     { price1mOutputTokens: 0 },
     { timescaleData: { medianOutputSpeed: 50 } },
+    { medianOutputSpeed: 50 },
     { timescaleData: { medianTimeToFirstChunk: 0 } },
     { endToEndResponseTime: 2 },
   ]) {

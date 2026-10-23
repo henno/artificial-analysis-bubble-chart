@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.7.5
+// @version      2.7.6
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -16,9 +16,8 @@
   'use strict';
 
   const PREFIX = '[AA 3D Bubble]';
-  const VERSION = '2.7.5';
+  const VERSION = '2.7.6';
   const ID = 'aa3d-bubble-chart';
-  const HOME_NOTICE_ID = 'aa3d-model-page-notice';
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 4;
   const DEFAULT_TOLERANCE_METRICS = { intelligence: true, time: true, cost: true };
@@ -175,7 +174,7 @@
     const ids = (hasNativeModelFilter() || state.nativeBaseIds) && Array.isArray(store.selectedPageModels) ? state.nativeBaseIds || store.selectedPageModels.map(model => model.id) : visibleIds.length ? visibleIds : selectedIds;
     const byId = new Map(store.allPageModels.map(model => [model.id, model]));
     const models = ids.map(id => byId.get(id)).filter(Boolean);
-    return { models, allPageModels: store.allPageModels, selectedPageModels: store.selectedPageModels, setSelectedPageModels: store.setSelectedPageModels, colorById, colorByProvider, selected: selectedIds.length, visible: visibleIds.length, source: visibleIds.length ? 'native scatter + React models' : 'React selection' };
+    return { models, allPageModels: store.allPageModels, selectedPageModels: store.selectedPageModels, setSelectedPageModels: store.setSelectedPageModels, isFetching: store.isFetching, colorById, colorByProvider, selected: selectedIds.length, visible: visibleIds.length, source: visibleIds.length ? 'native scatter + React models' : 'React selection' };
   }
 
   function modelReleaseKey(model) {
@@ -188,7 +187,7 @@
     return [model.price1mInputTokens, model.price1mOutputTokens, model.cacheHitPrice,
       model.price1mBlended0To3To1, model.price1mBlended7To2To1, model.price1mBlended0To1To1,
       model.price1mBlended100To1To1, model.price1mBlended0To100To1,
-      model.timescaleData?.medianOutputSpeed, model.timescaleData?.medianTimeToFirstChunk,
+      model.medianOutputSpeed, model.timescaleData?.medianOutputSpeed, model.timescaleData?.medianTimeToFirstChunk,
       model.endToEndResponseTime, model.timeToFirstAnswerToken].some(value => finite(value) && value >= 0);
   }
 
@@ -199,6 +198,12 @@
   function isLocalOnlyModel(model, apiReleases) {
     // AA has no explicit local-only field. Use its API data as an estimate.
     return model.isOpenWeights === true && !apiReleases.has(modelReleaseKey(model));
+  }
+
+  function taskCost(model) {
+    // AA uses a flat cost object on the homepage and a nested object on model pages.
+    const cost = model.intelligenceIndexCostPerTask;
+    return finite(cost?.cost?.total) ? cost.cost.total : cost?.total;
   }
 
   function modelMetrics(models, colorById, colorByProvider, apiReleases) {
@@ -212,7 +217,7 @@
       color: colorById.get(model.id) || colorByProvider.get(model.creator?.name) || model.creator?.color || '#64748b',
       intelligence: model.intelligenceIndex,
       time: finite(model.intelligenceIndexTimePerTask) ? model.intelligenceIndexTimePerTask / 60 : NaN,
-      cost: model.intelligenceIndexCostPerTask?.cost?.total,
+      cost: taskCost(model),
     }));
   }
 
@@ -364,45 +369,13 @@
   }
 
   function getComparisonSection() {
-    return document.querySelector('#intelligence-comparisons') || document.querySelector('#intelligence-comparison-tabs');
+    return document.querySelector('#intelligence-comparisons') || document.querySelector('#intelligence-comparison-tabs') || document.querySelector('#intelligence #intelligence-category-tabs');
   }
 
   function getFirstChartRow() {
     const firstNativeChart = document.querySelector('main .recharts-wrapper');
     const section = firstNativeChart?.closest('section');
     return [...section?.children || []].find(child => child.contains(firstNativeChart)) || null;
-  }
-
-  function showModelPageNotice() {
-    const section = document.querySelector('#intelligence');
-    if (!section) return;
-    let notice = document.getElementById(HOME_NOTICE_ID);
-    if (!notice) {
-      notice = document.createElement('aside');
-      notice.id = HOME_NOTICE_ID;
-      notice.lang = 'en';
-      notice.setAttribute('aria-labelledby', 'aa3d-model-page-title');
-      notice.innerHTML = `
-        <style>
-          #${HOME_NOTICE_ID}{position:relative;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin:1.5rem 0;padding:1.75rem 1rem 1rem;border:1px solid #e5e5e5;border-left:4px solid #6d36a3;border-radius:8px;background:#fff;color:#171717;font:13px system-ui,sans-serif}
-          #${HOME_NOTICE_ID} h3{margin:0;font:20px Georgia,serif}
-          #${HOME_NOTICE_ID} p{max-width:650px;margin:.4rem 0 0;color:#555;font-size:13px;line-height:1.5}
-          #${HOME_NOTICE_ID} a{display:inline-flex;align-items:center;gap:.5rem;flex:none;padding:.65rem 1rem;border-radius:6px;background:#6d36a3;color:#fff;text-decoration:none;font-weight:600}
-          #${HOME_NOTICE_ID} a:hover{background:#572b83}#${HOME_NOTICE_ID} a:focus-visible{outline:2px solid #171717;outline-offset:3px}
-          #${HOME_NOTICE_ID} .aa3d-version{position:absolute;top:.4rem;right:.65rem;color:#666;font-size:11px}
-        </style>
-        <span class="aa3d-version" aria-label="Script version ${VERSION}">v${VERSION}</span>
-        <div><h3 id="aa3d-model-page-title">Intelligence, time and cost</h3><p>The bubble chart is on AA's model page, which provides the required cost data.</p></div>
-        <a>Open bubble chart <span aria-hidden="true">→</span></a>`;
-      const anchor = getFirstChartRow();
-      if (anchor) anchor.before(notice);
-      else section.prepend(notice);
-    }
-    const destination = new URL('/models', location.origin);
-    destination.search = location.search;
-    destination.hash = 'intelligence';
-    const link = notice.querySelector('a');
-    if (link.href !== destination.href) link.href = destination.href;
   }
 
   function positionModelPicker() {
@@ -1444,17 +1417,10 @@
   }
 
   function refresh(force = false) {
-    // The new homepage has no comparison section or cost data. Keep a route to the full chart.
-    if (location.pathname === '/' && !getComparisonSection()) {
-      chart?.remove(); chart = null;
-      showModelPageNotice();
-      return;
-    }
-    document.getElementById(HOME_NOTICE_ID)?.remove();
     if (!document.querySelector('#intelligence') || !getComparisonSection() || !getFirstChartRow()) { chart?.remove(); chart = null; return; }
     if (!createChartContainer()) return;
     const data = findArtificialAnalysisData();
-    if (!data) { status.textContent = 'Waiting for Artificial Analysis model data…'; return; }
+    if (!data || data.isFetching) { status.textContent = 'Waiting for Artificial Analysis model data…'; return; }
     if (initializeModelSelection(data)) { status.textContent = 'Selecting all AA models…'; return; }
     updateModelPicker(data);
     const apiReleases = apiReleaseKeys(data.allPageModels);
@@ -1487,7 +1453,7 @@
       models = models.filter(model => !hiddenIds.has(model.id));
     }
     syncNativeModelSelection(data, models);
-    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.releaseDate, m.isOpenWeights, modelReleaseKey(m), m.intelligenceIndex, m.intelligenceIndexTimePerTask, m.intelligenceIndexCostPerTask?.cost?.total, data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), [...apiReleases].sort(), state.showMissing, state.hideLocalUnknownTime, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.toleranceMetrics, state.search, state.regex, state.filters, chart.clientWidth]);
+    const signature = JSON.stringify([location.href, data.source, data.models.map(m => [m.id, m.releaseDate, m.isOpenWeights, modelReleaseKey(m), m.intelligenceIndex, m.intelligenceIndexTimePerTask, taskCost(m), data.colorById.get(m.id) || data.colorByProvider.get(m.creator?.name) || m.creator?.color]), [...apiReleases].sort(), state.showMissing, state.hideLocalUnknownTime, state.compactVertical, state.hideDominated, state.dominanceTolerance, state.toleranceMetrics, state.search, state.regex, state.filters, chart.clientWidth]);
     if (!force && signature === state.signature) return;
     state.signature = signature;
     updateExplanations(state.showMissing ? rawModels : all, hidden);
