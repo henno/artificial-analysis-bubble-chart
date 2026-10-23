@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ArtificialAnalysis.io: Compare Intelligence, Time AND Cost
 // @namespace    https://artificialanalysis.ai/
-// @version      2.7.4
+// @version      2.7.5
 // @description  Compare AI models by intelligence, time, and cost in one chart. Hide dominated models.
 // @homepageURL  https://github.com/henno/artificial-analysis-bubble-chart
 // @supportURL   https://github.com/henno/artificial-analysis-bubble-chart/issues
@@ -16,8 +16,9 @@
   'use strict';
 
   const PREFIX = '[AA 3D Bubble]';
-  const VERSION = '2.7.4';
+  const VERSION = '2.7.5';
   const ID = 'aa3d-bubble-chart';
+  const HOME_NOTICE_ID = 'aa3d-model-page-notice';
   const STORAGE_KEY = 'aa3d-bubble-settings-v1';
   const DEFAULT_DOMINANCE_TOLERANCE = 4;
   const DEFAULT_TOLERANCE_METRICS = { intelligence: true, time: true, cost: true };
@@ -370,6 +371,38 @@
     const firstNativeChart = document.querySelector('main .recharts-wrapper');
     const section = firstNativeChart?.closest('section');
     return [...section?.children || []].find(child => child.contains(firstNativeChart)) || null;
+  }
+
+  function showModelPageNotice() {
+    const section = document.querySelector('#intelligence');
+    if (!section) return;
+    let notice = document.getElementById(HOME_NOTICE_ID);
+    if (!notice) {
+      notice = document.createElement('aside');
+      notice.id = HOME_NOTICE_ID;
+      notice.lang = 'en';
+      notice.setAttribute('aria-labelledby', 'aa3d-model-page-title');
+      notice.innerHTML = `
+        <style>
+          #${HOME_NOTICE_ID}{position:relative;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin:1.5rem 0;padding:1.75rem 1rem 1rem;border:1px solid #e5e5e5;border-left:4px solid #6d36a3;border-radius:8px;background:#fff;color:#171717;font:13px system-ui,sans-serif}
+          #${HOME_NOTICE_ID} h3{margin:0;font:20px Georgia,serif}
+          #${HOME_NOTICE_ID} p{max-width:650px;margin:.4rem 0 0;color:#555;font-size:13px;line-height:1.5}
+          #${HOME_NOTICE_ID} a{display:inline-flex;align-items:center;gap:.5rem;flex:none;padding:.65rem 1rem;border-radius:6px;background:#6d36a3;color:#fff;text-decoration:none;font-weight:600}
+          #${HOME_NOTICE_ID} a:hover{background:#572b83}#${HOME_NOTICE_ID} a:focus-visible{outline:2px solid #171717;outline-offset:3px}
+          #${HOME_NOTICE_ID} .aa3d-version{position:absolute;top:.4rem;right:.65rem;color:#666;font-size:11px}
+        </style>
+        <span class="aa3d-version" aria-label="Script version ${VERSION}">v${VERSION}</span>
+        <div><h3 id="aa3d-model-page-title">Intelligence, time and cost</h3><p>The bubble chart is on AA's model page, which provides the required cost data.</p></div>
+        <a>Open bubble chart <span aria-hidden="true">→</span></a>`;
+      const anchor = getFirstChartRow();
+      if (anchor) anchor.before(notice);
+      else section.prepend(notice);
+    }
+    const destination = new URL('/models', location.origin);
+    destination.search = location.search;
+    destination.hash = 'intelligence';
+    const link = notice.querySelector('a');
+    if (link.href !== destination.href) link.href = destination.href;
   }
 
   function positionModelPicker() {
@@ -1411,6 +1444,13 @@
   }
 
   function refresh(force = false) {
+    // The new homepage has no comparison section or cost data. Keep a route to the full chart.
+    if (location.pathname === '/' && !getComparisonSection()) {
+      chart?.remove(); chart = null;
+      showModelPageNotice();
+      return;
+    }
+    document.getElementById(HOME_NOTICE_ID)?.remove();
     if (!document.querySelector('#intelligence') || !getComparisonSection() || !getFirstChartRow()) { chart?.remove(); chart = null; return; }
     if (!createChartContainer()) return;
     const data = findArtificialAnalysisData();

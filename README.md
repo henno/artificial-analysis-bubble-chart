@@ -4,7 +4,7 @@
 
 [Artificial Analysis](https://artificialanalysis.ai/) charts compare two measures at a time. This makes it hard to see how intelligence, task time, and cost relate to each other. This userscript adds one bubble chart that shows all three. Higher bubbles mean more intelligence, bubbles farther left mean less time, and smaller bubbles mean lower cost.
 
-The userscript runs on all `artificialanalysis.ai` pages. It shows the bubble chart on pages with the required model comparison data.
+The userscript runs on all `artificialanalysis.ai` pages. It shows the bubble chart on pages with the required model comparison data, including the [model page](https://artificialanalysis.ai/models#intelligence). AA's new homepage does not provide the required cost data. On that page, the script shows an **Open bubble chart** link to the model page. The link keeps the current query parameters, and your saved chart settings still apply.
 
 ## Problem 2: More than 600 models crowd the charts
 
