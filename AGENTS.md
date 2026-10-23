@@ -5,6 +5,8 @@
 - Ava `https://artificialanalysis.ai/` päris brauseris. Oota, kuni lehel on `#intelligence` ja AA mudeliandmed.
 - Kui kasutad Codexi brauseritööriista, liigu lehele käsuga `tab.goto('https://artificialanalysis.ai/')`. See tööriist ei toeta CDP käsku `Page.navigate`.
 - Käivita kontrollitav kohalik userscript lehel. Enne uue kasutaja testi salvesta `localStorage` võtme `aa3d-bubble-settings-v1` senine väärtus ja eemalda võti ajutiselt. Taasta väärtus pärast testi.
+- Kontrolli kuluandmeid eraldi avalehel ja lehel `https://artificialanalysis.ai/models`. Avalehel on kulu väljas `intelligenceIndexCostPerTask.total`; mudelite lehel on see väljas `intelligenceIndexCostPerTask.cost.total`. Kontrolli mõlemal lehel päris mudeli kulu ja aega ning nende kuvamist graafikul. Nullkulu on kehtiv väärtus; puuduvat kulu ei tohi käsitleda nullina.
+- Oota enne mudelivaliku muutmist, kuni AA andmepakkuja `isFetching` on väär. Esialgsed mudeliandmed võivad olla poolikud. Avalehel peab ilmuma täielik graafik.
 - Kontrolli, et esimesel käivitamisel valib skript kõik AA mudelid enne domineerimisfiltrit. Kontrolli ka 4% tolerantsi, sisse lülitatud **Hide dominated models** valikut ja AA enda mudelivaliku muutumist.
 - Kontrolli, et sildid, 2D Pareto joon, 3D Pareto piirjoon ja kuluga võrdelised ringid on näha ilma eraldi linnukesteta.
 - Uuenda lehte ja käivita skript uuesti. Kontrolli, et salvestatud seaded ja AA mudelivalik püsivad. Vaata üle graafik, veateated ja ekraanipilt.
